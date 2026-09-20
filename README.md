@@ -8,7 +8,7 @@ It reports three kinds of drift:
 * wrong data types
 * undocumented status codes
 
-Exit code 0 means spec and API match. Exit code 1 means drift. That makes it a one line gate in a CI/CD pipeline.
+Exit code 0 means spec and API match. Exit code 1 means drift. Exit code 2 means the check could not be completed. That makes it a one line gate in a CI/CD pipeline.
 
 ## Install
 
@@ -161,9 +161,15 @@ When the API drifts, exit code 1 fails the step and the build goes red.
 
 ## Tested against real specifications
 
-The schema checks were run against the public OpenAPI descriptions of Swagger Petstore, GitHub and Stripe, about 900 GET operations and 1700 documented responses in total. Conforming responses were generated from each schema and fed through the checker. There were no false alarms and no crashes. The only findings pointed at a genuine inconsistency inside GitHub's own spec, where an object requires a field `tags` but only defines `tag`.
 
-That verifies the comparison logic. It does not replace running SpecSentinel against your own live API.
+The schema checks were run against the public OpenAPI descriptions of Swagger Petstore, GitHub and Stripe: 920 GET operations and 2032 documented JSON responses in total. For every response a conforming example was generated from its schema and fed through the checker. It produced no findings and no crashes.
+
+
+You can repeat the run yourself with `python tools/spec_smoke.py <spec file or URL>`. The exact output is in `docs/smoke_results.md`.
+
+
+The generator and the checker share the same reading of the schema, so this run shows that the checker raises no false alarms on large real specifications. It does not show that every kind of drift is caught, and it does not replace running SpecSentinel against your own live API.
+
 
 ## Limits of this version
 

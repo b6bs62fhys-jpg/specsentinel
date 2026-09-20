@@ -1,217 +1,222 @@
-"""Smoke-test the checker against a spec.
+"""Smoke test the SpecSentinel checker against a real OpenAPI description.
 
-For every JSON schema of a GET response, build a schema-conforming example
-body and run it through check_response. Schemas that are broken or that trip
-up the checker show up as findings or crashes instead of requiring a live API.
+
+For every GET operation and every documented JSON response, a conforming
+example is generated from the response schema and fed through the checker.
+A conforming example must produce no findings. Any finding is therefore either
+a bug in the checker, a weakness of this generator, or a real inconsistency
+inside the spec, and is listed so it can be looked at by hand.
+
+
+This verifies the comparison logic. It does not replace a run against a live API.
+
+
+Usage: python tools/spec_smoke.py <path or URL to an OpenAPI file>
 """
 from __future__ import annotations
 
+
 import json
 import sys
+from collections import Counter
+
 
 from specsentinel.checker import ERROR, check_response, validate_value
-from specsentinel.spec import SpecError, deref, iter_get_operations, load_spec
-
-MAX_DEPTH = 25
-MAX_FINDINGS_SHOWN = 10
+from specsentinel.spec import deref, iter_get_operations, load_spec
 
 
-def _scalar_value(schema: dict):
-    if isinstance(schema.get("enum"), list) and schema["enum"]:
-        return schema["enum"][0]
-    for key in ("example", "default"):
-        if key in schema:
-            return schema[key]
-    declared = schema.get("type")
-    if isinstance(declared, list):
-        declared = next((t for t in declared if t != "null"), None)
-    if declared == "boolean":
-        return False
-    if declared == "number":
-        return 1.0
-    if declared == "integer":
-        return 1
-    if declared == "null":
-        return None
-    return "string"
+MAX_DEPTH = 60  # hard stop, cycles are cut earlier through the $ref chain
+MAX_REF_REPEAT = 2  # how often one $ref may repeat inside itself
 
 
-def _minimal_value(spec: dict, schema: dict, stack: frozenset, depth: int):
-    """Smallest value that is still mostly valid, used to break cycles."""
-    schema = flatten(spec, schema)
-    if schema.get("oneOf") or schema.get("anyOf"):
-        for alt in schema.get("oneOf") or schema.get("anyOf"):
-            return generate_value(spec, alt, stack, depth + 1)
-    if "properties" in schema or schema.get("type") == "object":
-        obj = {}
-        props = schema.get("properties") or {}
-        for name in schema.get("required") or []:
-            prop = deref(spec, props.get(name) or {})
-            if isinstance(prop, dict) and id(prop) in stack:
-                continue  # cyclic property would never terminate
-            obj[name] = generate_value(spec, props[name], stack, depth + 1)
-        return obj
-    if "items" in schema:
-        return []
-    return _scalar_value(schema)
 
 
-def flatten(spec: dict, schema: dict) -> dict:
-    """Resolve references and merge allOf, safe for the generator."""
+def _first_type(schema: dict):
+    t = schema.get("type")
+    if isinstance(t, list):
+        non_null = [x for x in t if x != "null"]
+        return non_null[0] if non_null else "null"
+    return t
+
+
+
+
+def _minimal(spec: dict, schema, depth: int):
+    """Smallest value that is plausible for the schema. Used when recursion is cut off."""
     schema = deref(spec, schema)
-    if isinstance(schema, dict):
-        return _merge_all_of(spec, schema, 0)
-    return {}
-
-
-def _merge_all_of(spec: dict, schema: dict, depth: int) -> dict:
-    if not isinstance(schema, dict) or "allOf" not in schema or depth > MAX_DEPTH:
-        return schema
-    merged = {k: v for k, v in schema.items() if k != "allOf"}
-    properties = dict(merged.get("properties") or {})
-    required = list(merged.get("required") or [])
-    for member in schema["allOf"] or []:
-        flat = _merge_all_of(spec, deref(spec, member), depth + 1)
-        for key, val in flat.items():
-            if key == "properties":
-                properties.update(val)
-            elif key == "required":
-                required.extend(r for r in val if r not in required)
-            elif key not in merged:
-                merged[key] = val
-    if properties:
-        merged["properties"] = properties
-    if required:
-        merged["required"] = required
-    return merged
-
-
-def generate_value(spec: dict, schema, stack: frozenset = frozenset(), depth: int = 0):
-    """Build a concrete value that satisfies the schema, if one exists."""
-    raw = deref(spec, schema)
-    if not isinstance(raw, dict):
+    if not isinstance(schema, dict):
         return None
-    if depth > MAX_DEPTH or id(raw) in stack:
-        return _minimal_value(spec, raw, stack, depth)  # cycle: minimal object, not null
-    new_stack = stack | {id(raw)}
-    schema = flatten(spec, raw)
-
-    if schema.get("oneOf") or schema.get("anyOf"):
-        best, best_value = None, None
-        for alt in schema.get("oneOf") or schema.get("anyOf"):
-            candidate = generate_value(spec, alt, new_stack, depth + 1)
-            errors = validate_value(spec, schema, candidate, "body")
-            if not any(f.severity == ERROR for f in errors):
-                return candidate  # variant the schema itself accepts
-            if best is None or len(errors) < len(best):
-                best, best_value = errors, candidate
-        return best_value
-
-    if isinstance(schema.get("enum"), list) and schema["enum"]:
+    if schema.get("enum"):
         return schema["enum"][0]
-    for key in ("example", "default"):
-        if key in schema:
-            return schema[key]
-
-    declared = schema.get("type")
-    if isinstance(declared, list):
-        declared = next((t for t in declared if t != "null"), None)
-
-    if "properties" in schema or declared == "object":
-        props = schema.get("properties") or {}
-        return {name: generate_value(spec, sub, new_stack, depth + 1)
-                for name, sub in props.items()}
-    if "items" in schema or declared == "array":
-        items = schema.get("items")
-        return [generate_value(spec, items, new_stack, depth + 1)] if items else []
-    if declared == "boolean":
-        return False
-    if declared == "number":
-        return 1.0
-    if declared == "integer":
-        return 1
-    if declared == "null":
-        return None
-    if declared == "string":
-        return "string"
-    if declared == "array":
-        return []
-    if declared == "object":
+    t = _first_type(schema)
+    if t == "object" or (t is None and "properties" in schema):
         return {}
-    return _scalar_value(schema)
+    if t == "array":
+        return []
+    return {"string": "x", "integer": 1, "number": 1.5, "boolean": True}.get(t)
 
 
-def _status_code(status_key: str) -> int:
-    if status_key.isdigit():
-        return int(status_key)
-    return 200  # 2XX / default responses are matched against a generic success code
 
 
-def smoke(spec: dict):
-    get_operations = list(iter_get_operations(spec))
-    checked = 0
-    findings = []
-    crashes = 0
+def generate(spec: dict, schema, depth: int = 0, refs: tuple = ()):
+    """Build an example value for a schema.
 
-    for path, _, operation in get_operations:
-        responses = deref(spec, operation.get("responses") or {})
-        if not isinstance(responses, dict):
-            continue
-        for status_key, response_raw in responses.items():
-            response = deref(spec, response_raw)
-            if not isinstance(response, dict):
+
+    Recursive schemas are cut through the chain of $ref targets: once a target
+    repeats inside itself, only required properties are generated.
+    """
+    lean = False
+    hops = 0
+    while isinstance(schema, dict) and "$ref" in schema:
+        ref = schema["$ref"]
+        if refs.count(ref) >= MAX_REF_REPEAT:
+            return _minimal(spec, deref(spec, schema), depth)
+        lean = lean or refs.count(ref) >= 1
+        refs = refs + (ref,)
+        schema = deref(spec, {"$ref": ref})
+        hops += 1
+        if hops > 50:
+            return None
+    if not isinstance(schema, dict):
+        return None
+    if depth > MAX_DEPTH:
+        return _minimal(spec, schema, depth)
+    if schema.get("enum"):
+        return schema["enum"][0]
+    if "const" in schema:
+        return schema["const"]
+
+
+    if "allOf" in schema:
+        merged = {k: v for k, v in schema.items() if k != "allOf"}
+        props = dict(merged.get("properties") or {})
+        required = list(merged.get("required") or [])
+        for part in schema["allOf"]:
+            part = deref(spec, part)
+            if not isinstance(part, dict):
                 continue
-            for media, media_raw in (response.get("content") or {}).items():
-                if "json" not in media.lower():
-                    continue
-                media_object = deref(spec, media_raw) or {}
-                schema = media_object.get("schema") if isinstance(media_object, dict) else None
-                if not schema:
-                    continue
-                try:
-                    value = generate_value(spec, schema)
-                    body = json.dumps(value).encode("utf-8")
-                    found = check_response(spec, operation, _status_code(str(status_key)),
-                                           {"Content-Type": media}, body)
-                except Exception as exc:  # a crash is a finding in itself
-                    crashes += 1
-                    findings.append(
-                        (path, str(status_key),
-                         f"crash: {type(exc).__name__}: {exc}"))
-                    continue
-                checked += 1
-                findings.extend((path, str(status_key), f) for f in found)
-
-    return get_operations, checked, findings, crashes
+            props.update(part.get("properties") or {})
+            required += part.get("required") or []
+            for key in ("type", "items", "enum"):
+                if key in part and key not in merged:
+                    merged[key] = part[key]
+        merged["properties"] = props
+        merged["required"] = required
+        return generate(spec, merged, depth + 1, refs)
 
 
-def main(argv=None) -> int:
-    argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv:
-        print("usage: spec_smoke.py <openapi-file-or-url>")
+    for key in ("oneOf", "anyOf"):
+        if schema.get(key):
+            best = None
+            for alternative in schema[key]:
+                candidate = generate(spec, alternative, depth + 1, refs)
+                if best is None:
+                    best = candidate
+                problems = [f for f in validate_value(spec, alternative, candidate, "body")
+                            if f.severity == ERROR]
+                if not problems:
+                    return candidate
+            return best
+
+
+    t = _first_type(schema)
+    if t is None:
+        t = "object" if "properties" in schema else ("array" if "items" in schema else None)
+    if t == "object":
+        required = set(schema.get("required") or [])
+        out = {}
+        for name, sub in (schema.get("properties") or {}).items():
+            if lean and name not in required:
+                continue
+            out[name] = generate(spec, sub, depth + 1, refs)
+        for name in required:
+            out.setdefault(name, None)
+        return out
+    if t == "array":
+        item = generate(spec, schema.get("items") or {}, depth + 1, refs)
+        return [] if item is None else [item]
+    if t == "string":
+        fmt = schema.get("format")
+        return {"date-time": "2020-01-01T00:00:00Z", "date": "2020-01-01",
+                "uri": "https://example.com", "email": "a@example.com"}.get(fmt, "x")
+    if t == "integer":
+        return int(schema["minimum"]) if schema.get("minimum") is not None else 1
+    if t == "number":
+        return float(schema["minimum"]) if schema.get("minimum") is not None else 1.5
+    if t == "boolean":
+        return True
+    return None
+
+
+
+
+def status_for(key) -> int:
+    key = str(key)
+    if key.lower() == "default":
+        return 418  # not documented explicitly, so it falls through to default
+    if key.upper().endswith("XX"):
+        return int(key[0]) * 100
+    return int(key)
+
+
+
+
+def run(source: str) -> dict:
+    spec = load_spec(source)
+    result = {"operations": 0, "checked": 0, "flagged": 0, "crashes": 0,
+              "codes": Counter(), "samples": []}
+    for path, _item, operation in iter_get_operations(spec):
+        result["operations"] += 1
+        for status, response in deref(spec, operation.get("responses") or {}).items():
+            try:
+                response = deref(spec, response)
+                for media, body_spec in (response.get("content") or {}).items():
+                    if "json" not in media.lower() or "schema" not in body_spec:
+                        continue
+                    result["checked"] += 1
+                    body = json.dumps(generate(spec, body_spec["schema"])).encode()
+                    findings = [f for f in check_response(
+                        spec, operation, status_for(status),
+                        {"content-type": media}, body) if f.severity == ERROR]
+                    if findings:
+                        result["flagged"] += 1
+                        for f in findings:
+                            result["codes"][f.code] += 1
+                        if len(result["samples"]) < 10:
+                            f = findings[0]
+                            result["samples"].append(
+                                f"{path} [{status}] {f.code} at {f.location}: {f.message}")
+            except Exception as exc:  # a crash is a result, not a reason to stop
+                result["crashes"] += 1
+                if len(result["samples"]) < 10:
+                    result["samples"].append(f"{path} [{status}] CRASH {type(exc).__name__}: {exc}")
+    return result
+
+
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        print(__doc__)
         return 2
     try:
-        spec = load_spec(argv[0])
-    except SpecError as exc:
-        print(f"error: {exc}")
+        r = run(argv[1])
+    except Exception as exc:
+        print(f"could not load spec: {exc}")
         return 2
+    print(f"Spec:                {argv[1]}")
+    print(f"GET operations:      {r['operations']}")
+    print(f"JSON responses:      {r['checked']}")
+    print(f"Responses flagged:   {r['flagged']}")
+    print(f"Crashes:             {r['crashes']}")
+    if r["codes"]:
+        print(f"Finding codes:       {dict(r['codes'])}")
+    for line in r["samples"]:
+        print("  " + line)
+    return 0 if r["crashes"] == 0 else 1
 
-    get_operations, checked, findings, crashes = smoke(spec)
 
-    print(f"Spec:           {argv[0]}")
-    print(f"GET operations: {len(get_operations)}")
-    print(f"Checked:        {checked}")
-    print(f"Findings:       {len(findings)}")
-    print(f"Crashes:        {crashes}")
-    for path, status, detail in findings[:MAX_FINDINGS_SHOWN]:
-        if isinstance(detail, str):
-            print(f"GET {path}  {status}  {detail}")
-        else:
-            print(f"GET {path}  {status}  {detail.severity} {detail.code} "
-                  f"({detail.location}): {detail.message}")
-
-    return 1 if findings else 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main(sys.argv))
