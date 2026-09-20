@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: Petstore demo
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+  /pets:
+    get:
+      responses:
+        "200":
+          description: All pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pet"
+  /pets/{petId}:
+    get:
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          example: 1
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: One pet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        "404":
+          description: Pet not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stats:
+    get:
+      responses:
+        "200":
+          description: Store statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, active]
+                properties:
+                  total:
+                    type: integer
+                  active:
+                    type: integer
+  /owners/{ownerId}:
+    get:
+      parameters:
+        - name: ownerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: One owner
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        tag:
+          type: string
+        status:
+          type: string
+          enum: [available, sold]
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
