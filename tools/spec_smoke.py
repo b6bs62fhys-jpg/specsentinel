@@ -1,34 +1,26 @@
 """Smoke test the SpecSentinel checker against a real OpenAPI description.
 
-
 For every GET operation and every documented JSON response, a conforming
 example is generated from the response schema and fed through the checker.
 A conforming example must produce no findings. Any finding is therefore either
 a bug in the checker, a weakness of this generator, or a real inconsistency
 inside the spec, and is listed so it can be looked at by hand.
 
-
 This verifies the comparison logic. It does not replace a run against a live API.
-
 
 Usage: python tools/spec_smoke.py <path or URL to an OpenAPI file>
 """
 from __future__ import annotations
 
-
 import json
 import sys
 from collections import Counter
 
-
 from specsentinel.checker import ERROR, check_response, validate_value
 from specsentinel.spec import deref, iter_get_operations, load_spec
 
-
 MAX_DEPTH = 60  # hard stop, cycles are cut earlier through the $ref chain
 MAX_REF_REPEAT = 2  # how often one $ref may repeat inside itself
-
-
 
 
 def _first_type(schema: dict):
@@ -37,8 +29,6 @@ def _first_type(schema: dict):
         non_null = [x for x in t if x != "null"]
         return non_null[0] if non_null else "null"
     return t
-
-
 
 
 def _minimal(spec: dict, schema, depth: int):
@@ -56,11 +46,8 @@ def _minimal(spec: dict, schema, depth: int):
     return {"string": "x", "integer": 1, "number": 1.5, "boolean": True}.get(t)
 
 
-
-
 def generate(spec: dict, schema, depth: int = 0, refs: tuple = ()):
     """Build an example value for a schema.
-
 
     Recursive schemas are cut through the chain of $ref targets: once a target
     repeats inside itself, only required properties are generated.
@@ -86,7 +73,6 @@ def generate(spec: dict, schema, depth: int = 0, refs: tuple = ()):
     if "const" in schema:
         return schema["const"]
 
-
     if "allOf" in schema:
         merged = {k: v for k, v in schema.items() if k != "allOf"}
         props = dict(merged.get("properties") or {})
@@ -104,7 +90,6 @@ def generate(spec: dict, schema, depth: int = 0, refs: tuple = ()):
         merged["required"] = required
         return generate(spec, merged, depth + 1, refs)
 
-
     for key in ("oneOf", "anyOf"):
         if schema.get(key):
             best = None
@@ -117,7 +102,6 @@ def generate(spec: dict, schema, depth: int = 0, refs: tuple = ()):
                 if not problems:
                     return candidate
             return best
-
 
     t = _first_type(schema)
     if t is None:
@@ -148,8 +132,6 @@ def generate(spec: dict, schema, depth: int = 0, refs: tuple = ()):
     return None
 
 
-
-
 def status_for(key) -> int:
     key = str(key)
     if key.lower() == "default":
@@ -157,8 +139,6 @@ def status_for(key) -> int:
     if key.upper().endswith("XX"):
         return int(key[0]) * 100
     return int(key)
-
-
 
 
 def run(source: str) -> dict:
@@ -193,8 +173,6 @@ def run(source: str) -> dict:
     return result
 
 
-
-
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
         print(__doc__)
@@ -214,8 +192,6 @@ def main(argv: list[str]) -> int:
     for line in r["samples"]:
         print("  " + line)
     return 0 if r["crashes"] == 0 else 1
-
-
 
 
 if __name__ == "__main__":

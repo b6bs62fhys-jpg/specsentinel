@@ -1,10 +1,7 @@
 import importlib.util
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent.parent
-
-
 
 
 def _load():
@@ -14,16 +11,12 @@ def _load():
     return module
 
 
-
-
 def test_smoke_script_finds_no_drift_in_conforming_examples():
     result = _load().run(str(ROOT / "examples" / "petstore.yaml"))
     assert result["operations"] > 0
     assert result["checked"] > 0
     assert result["flagged"] == 0
     assert result["crashes"] == 0
-
-
 
 
 def test_smoke_script_handles_recursive_schemas():
