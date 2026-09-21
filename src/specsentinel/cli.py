@@ -167,10 +167,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.write_baseline:
         try:
-            write_baseline(args.write_baseline, collect_entries(report))
+            entries = collect_entries(report)
+            write_baseline(args.write_baseline, entries)
         except BaselineError as exc:
             print(f"specsentinel: {_one_line(exc)}", file=sys.stderr)
             return 2
+        if args.format == "json":
+            print(json.dumps({"exit_code": 0, "baseline": args.write_baseline,
+                              "findings": len(entries)}, indent=2))
+        else:
+            print(f"Wrote {len(entries)} findings to {args.write_baseline}")
+        return 0
 
     render = render_json if args.format == "json" else render_text
     print(render(report, args.spec, args.url))

@@ -176,10 +176,11 @@ specsentinel openapi.yaml --url https://staging.example.com --write-baseline bas
 specsentinel openapi.yaml --url https://staging.example.com --baseline baseline.json
 ```
 
-The first command writes every current finding to `baseline.json` and exits 1,
-because nothing is accepted yet. The second run ignores those findings: they are
-counted as `baselined` and no longer affect the exit code. New findings behave as
-before, so an error still fails and a warning still needs `--strict`.
+The first command writes every current finding to `baseline.json` and exits 0:
+recording the baseline is the goal, so a run that writes the file succeeds. The
+second run ignores those findings: they are counted as `baselined` and no longer
+affect the exit code. New findings behave as before, so an error still fails and
+a warning still needs `--strict`.
 
 A finding is matched by method, path, code and location, not by its message, so
 editing a message does not invalidate the baseline. Baseline findings that no

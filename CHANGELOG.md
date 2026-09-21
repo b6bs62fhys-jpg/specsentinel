@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--baseline FILE` accepts those findings, so only new drift fails. Findings
   are matched by method, path, code and location, not by message. Accepted
   findings are counted as `baselined` and no longer affect the exit code.
-  Baseline entries that no longer occur are reported as `fixed`.
+  Baseline entries that no longer occur are reported as `fixed`. A run that
+  writes the baseline exits 0 once the file is written.
 
 ### Changed
 

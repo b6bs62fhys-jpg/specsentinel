@@ -16,8 +16,9 @@ def write_baseline(path, entries):
 def test_write_baseline_records_all_findings(capsys, tmp_path, spec_path, start_server):
     url = start_server(drift=True)
     baseline = tmp_path / "baseline.json"
-    code, _ = run(capsys, spec_path, "--url", url, "--write-baseline", str(baseline))
-    assert code == 1  # nothing is accepted yet, the run still reports drift
+    code, out = run(capsys, spec_path, "--url", url, "--write-baseline", str(baseline))
+    assert code == 0  # writing the baseline is the goal, so the run succeeds
+    assert "Wrote 4 findings" in out.out
     data = json.loads(baseline.read_text())
     codes = {entry["code"] for entry in data["findings"]}
     assert {"MISSING_FIELD", "TYPE_MISMATCH", "UNDOCUMENTED_STATUS"} <= codes
