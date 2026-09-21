@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from . import __version__
 from .checker import ERROR, WARNING, Finding, check_response
-from .spec import SpecError, deref, iter_get_operations
+from .spec import RefLoadError, SpecError, deref, iter_get_operations
 
 _MISSING = object()
 
@@ -170,6 +170,9 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
         except Skip as skip:
             result.skipped = str(skip)
             continue
+        except RefLoadError as exc:
+            result.error = f"spec problem: {exc}"
+            continue
         except SpecError as exc:
             result.skipped = f"spec problem: {exc}"
             continue
@@ -191,6 +194,9 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
         result.status = status
         try:
             result.findings = check_response(spec, operation, status, response_headers, body)
+        except RefLoadError as exc:
+            result.error = f"spec problem: {exc}"
+            result.status = None
         except SpecError as exc:
             result.skipped = f"spec problem: {exc}"
             result.status = None
