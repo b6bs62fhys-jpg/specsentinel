@@ -34,15 +34,15 @@ inputs:
     description: Exact SpecSentinel version to install, for example "0.3.0". When empty, the latest release is installed.
     required: false
     default: ""
+outputs:
+  summary:
+    description: >-
+      Markdown that was appended to the step summary: the result, the
+      checked/drift/skipped/baselined counts and the first 20 findings
+      (code, method and path). Header values are never included.
+    value: ${{ steps.check.outputs.summary }}
 runs:
   using: composite
-  outputs:
-    summary:
-      description: >-
-        Markdown that was appended to the step summary: the result, the
-        checked/drift/skipped/baselined counts and the first 20 findings
-        (code, method and path). Header values are never included.
-      value: ${{ steps.check.outputs.summary }}
   steps:
     - name: Set up Python
       uses: actions/setup-python@v5
