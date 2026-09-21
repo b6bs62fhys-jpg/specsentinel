@@ -130,10 +130,10 @@ included in the output.
   "exit_code": 1,
   "summary": {
     "checked": 4,
-    "drift": 2,
+    "drift": 1,
     "skipped": 1,
     "failed": 0,
-    "counts": {"error": 4, "warning": 1}
+    "counts": {"error": 1, "warning": 1}
   },
   "findings": [
     {"code": "MISSING_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "error"},
@@ -146,7 +146,8 @@ included in the output.
       "status": 200,
       "state": "DRIFT",
       "findings": [
-        {"severity": "error", "code": "MISSING_FIELD", "location": "body.name", "message": "required field is missing in the response"}
+        {"severity": "error", "code": "MISSING_FIELD", "location": "body.name", "message": "required field is missing in the response"},
+        {"severity": "warning", "code": "UNDOCUMENTED_FIELD", "location": "body.extra", "message": "field is not documented in the spec"}
       ]
     }
   ]
