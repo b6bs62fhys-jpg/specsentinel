@@ -15,6 +15,20 @@ It reports three kinds of drift:
 
 Exit code 0 means spec and API match. Exit code 1 means drift. Exit code 2 means the check could not be completed. That makes it a one line gate in a CI/CD pipeline.
 
+## New in 0.2.0
+
+* More warnings for the values an API returns: string formats (`date-time`,
+  `uuid`, `email`, `uri`), string lengths, numeric ranges and patterns, and
+  required response headers that are missing.
+* `--format json` now adds per severity `counts` and a flat `findings` list
+  next to the per operation details.
+* The GitHub Action takes a `version` input to install an exact SpecSentinel
+  release instead of the latest one.
+
+Note for `--strict` users: the new checks are warnings, so a run that used to
+be green can turn red with `--strict`. Review the new findings before enabling
+strict in an existing pipeline.
+
 ## Install
 
 Python 3.9 or newer.
@@ -41,7 +55,7 @@ specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
 Real output:
 
 ```
-SpecSentinel 0.1.2
+SpecSentinel 0.2.0
 Spec:   examples/petstore.yaml
 Target: http://127.0.0.1:8099
 
@@ -123,7 +137,7 @@ included in the output.
 
 ```json
 {
-  "version": "0.1.2",
+  "version": "0.2.0",
   "spec": "examples/petstore.yaml",
   "target": "http://127.0.0.1:8099",
   "strict": false,
@@ -196,7 +210,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: b6bs62fhys-jpg/specsentinel@v0.1.2
+      - uses: b6bs62fhys-jpg/specsentinel@v0.2.0
         with:
           spec: openapi.yaml
           url: https://staging.example.com
@@ -212,7 +226,7 @@ Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
 `header` (sent with every request, passed through an environment variable and
 not written to the log), `params_file`, `strict` (default `false`),
 `python_version` (default `3.12`) and `version`. `version` pins the exact
-SpecSentinel release that gets installed, for example `0.1.2`. When it is
+SpecSentinel release that gets installed, for example `0.2.0`. When it is
 empty, the latest release is installed.
 
 ## Tested against real specifications
