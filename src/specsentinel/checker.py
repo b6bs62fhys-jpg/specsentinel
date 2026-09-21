@@ -5,7 +5,6 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 from urllib.parse import urlparse
 
 from .spec import deref
@@ -68,17 +67,28 @@ def enum_contains(options: list, value) -> bool:
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+_DATETIME_RE = re.compile(
+    r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})"
+    r"[Tt]"
+    r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
+    r"(?:\.\d+)?"
+    r"(?:[Zz]|[+-]\d{2}:\d{2})?$"
+)
+
+
 def _is_datetime(value: str) -> bool:
-    if "T" not in value.upper():
+    """RFC 3339 date-time. The fraction may have any number of digits and the
+    timezone may be omitted; both are common in real specs."""
+    match = _DATETIME_RE.match(value)
+    if match is None:
         return False
-    text = value
-    if text[-1:] in ("Z", "z"):
-        text = text[:-1] + "+00:00"
-    try:
-        datetime.fromisoformat(text)
-        return True
-    except ValueError:
-        return False
+    return (
+        1 <= int(match["month"]) <= 12
+        and 1 <= int(match["day"]) <= 31
+        and 0 <= int(match["hour"]) <= 23
+        and 0 <= int(match["minute"]) <= 59
+        and 0 <= int(match["second"]) <= 60
+    )
 
 
 def _is_uuid(value: str) -> bool:

@@ -17,6 +17,39 @@ def test_valid_date_time_passes():
     assert validate_value(SPEC, schema, "2020-01-01T12:30:45.123+02:00", "b") == []
 
 
+def test_date_time_accepts_any_number_of_fractional_digits():
+    schema = {"type": "string", "format": "date-time"}
+    for value in (
+        "2020-01-01T00:00:00.1Z",
+        "2020-01-01T00:00:00.123Z",
+        "2020-01-01T00:00:00.123456789Z",
+    ):
+        assert validate_value(SPEC, schema, value, "b") == []
+
+
+def test_date_time_with_z_and_offset_passes():
+    schema = {"type": "string", "format": "date-time"}
+    assert validate_value(SPEC, schema, "2020-01-01T00:00:00Z", "b") == []
+    assert validate_value(SPEC, schema, "2020-01-01T00:00:00+05:30", "b") == []
+    assert validate_value(SPEC, schema, "2020-01-01T00:00:00.123-08:00", "b") == []
+
+
+def test_date_time_without_timezone_passes():
+    schema = {"type": "string", "format": "date-time"}
+    assert validate_value(SPEC, schema, "2020-01-01T00:00:00", "b") == []
+    assert validate_value(SPEC, schema, "2020-01-01T00:00:00.123", "b") == []
+
+
+def test_date_time_rejects_month_out_of_range():
+    schema = {"type": "string", "format": "date-time"}
+    assert codes(validate_value(SPEC, schema, "2020-13-01T00:00:00Z", "b")) == ["FORMAT_MISMATCH"]
+
+
+def test_date_time_rejects_missing_t_separator():
+    schema = {"type": "string", "format": "date-time"}
+    assert codes(validate_value(SPEC, schema, "2020-01-01 00:00:00Z", "b")) == ["FORMAT_MISMATCH"]
+
+
 def test_invalid_date_time_is_a_warning():
     schema = {"type": "string", "format": "date-time"}
     result = validate_value(SPEC, schema, "tomorrow", "b")
