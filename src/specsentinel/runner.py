@@ -1,6 +1,7 @@
 """Build requests from the spec, send them, and collect the results."""
 from __future__ import annotations
 
+import fnmatch
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -11,6 +12,19 @@ from .checker import ERROR, WARNING, Finding, check_response
 from .spec import RefLoadError, SpecError, deref, iter_get_operations
 
 _MISSING = object()
+
+
+def _matches_any(patterns: list[str], path: str) -> bool:
+    return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
+
+
+def is_selected(path: str, include: list[str], exclude: list[str]) -> bool:
+    """A path is checked when it matches include (if any) and no exclude."""
+    if include and not _matches_any(include, path):
+        return False
+    if exclude and _matches_any(exclude, path):
+        return False
+    return True
 
 
 class Skip(Exception):
@@ -156,20 +170,31 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
               overrides: dict[str, str] | None = None,
               defaults: dict | None = None,
               per_operation: dict[str, dict] | None = None,
+              include: list[str] | None = None,
+              exclude: list[str] | None = None,
               timeout: float = 10.0, strict: bool = False) -> Report:
     """Check every GET operation.
 
     Parameter values are taken in this order, later wins:
     spec example, defaults (params file), per_operation (params file), overrides (--param).
+
+    ``include`` and ``exclude`` are path patterns with ``*`` as a wildcard.
+    Operations that do not match are reported as SKIPPED and do not affect the
+    exit code.
     """
     results: list[OperationResult] = []
     overrides = overrides or {}
     defaults = defaults or {}
     per_operation = per_operation or {}
+    include = include or []
+    exclude = exclude or []
 
     for path, path_item, operation in iter_get_operations(spec):
         result = OperationResult(method="GET", path=path)
         results.append(result)
+        if not is_selected(path, include, exclude):
+            result.skipped = "excluded"
+            continue
         merged = {**defaults, **per_operation.get(f"GET {path}", {}), **overrides}
         try:
             url, param_headers = build_request(spec, base_url, path, path_item,

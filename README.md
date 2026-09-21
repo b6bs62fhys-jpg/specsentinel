@@ -115,6 +115,8 @@ specsentinel SPEC --url BASE_URL [options]
   -H, --header 'N: v'    header sent with every request, repeatable
   --param NAME=VALUE     value for a path or query parameter, repeatable
   --params-file FILE     YAML or JSON file with parameter values
+  --include PATTERN      check only paths matching PATTERN, repeatable
+  --exclude PATTERN      skip paths matching PATTERN, repeatable
   --baseline FILE        ignore findings recorded in FILE
   --write-baseline FILE  write all current findings to FILE
   --timeout SECONDS      wait per request, default 10
@@ -187,6 +189,17 @@ editing a message does not invalidate the baseline. Baseline findings that no
 longer occur are listed as `fixed`, which tells you what can be removed. Re-run
 `--write-baseline` to refresh the file after fixing drift. In `--format json` the
 number is `summary.baselined` and the fixed findings are in the `fixed` list.
+
+## Choosing what to check
+
+Not every operation is safe or useful to call. `--include` and `--exclude` take a path pattern with `*` as a wildcard, and both can be repeated:
+
+```
+specsentinel openapi.yaml --url https://staging.example.com --exclude /user/logout
+specsentinel openapi.yaml --url https://staging.example.com --include '/pets*' --exclude '/pets/{petId}'
+```
+
+Without `--include` every operation is checked. With `--include` only the matching ones are, and `--exclude` takes paths out again. An excluded operation shows as SKIPPED with the reason `excluded`, does not change the exit code and appears in the JSON output. Use it for an operation such as `GET /user/logout` that is documented but has a side effect.
 
 ## How requests are built
 

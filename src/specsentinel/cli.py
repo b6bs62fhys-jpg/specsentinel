@@ -133,6 +133,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="value for a path or query parameter, repeatable")
     parser.add_argument("--params-file", metavar="FILE",
                         help="YAML or JSON file with parameter values (see README)")
+    parser.add_argument("--include", action="append", default=[], metavar="PATTERN",
+                        help="check only paths matching PATTERN, repeatable, * is a wildcard")
+    parser.add_argument("--exclude", action="append", default=[], metavar="PATTERN",
+                        help="skip paths matching PATTERN, repeatable, * is a wildcard")
     parser.add_argument("--baseline", metavar="FILE",
                         help="ignore findings recorded in FILE, so only new drift fails")
     parser.add_argument("--write-baseline", metavar="FILE",
@@ -164,6 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         report = run_check(spec, args.url, extra_headers=headers, overrides=overrides,
                            defaults=defaults, per_operation=per_operation,
+                           include=args.include, exclude=args.exclude,
                            timeout=args.timeout, strict=args.strict)
     except (ValueError, SpecError) as exc:
         return _fatal(exc, args.format)
