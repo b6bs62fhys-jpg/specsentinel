@@ -9,6 +9,13 @@ from pathlib import Path
 import yaml
 
 from . import __version__
+from .baseline import (
+    BaselineError,
+    apply_baseline,
+    collect_entries,
+    load_baseline,
+    write_baseline,
+)
 from .report import render_json, render_text
 from .runner import run_check
 from .spec import SpecError, load_spec
@@ -82,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="value for a path or query parameter, repeatable")
     parser.add_argument("--params-file", metavar="FILE",
                         help="YAML or JSON file with parameter values (see README)")
+    parser.add_argument("--baseline", metavar="FILE",
+                        help="ignore findings recorded in FILE, so only new drift fails")
+    parser.add_argument("--write-baseline", metavar="FILE",
+                        help="write all current findings to FILE as a JSON baseline")
     parser.add_argument("--timeout", type=float, default=10.0,
                         help="seconds to wait per request (default 10)")
     parser.add_argument("--strict", action="store_true",
@@ -101,8 +112,9 @@ def main(argv: list[str] | None = None) -> int:
         defaults, per_operation = ({}, {})
         if args.params_file:
             defaults, per_operation = _load_params_file(args.params_file)
+        baseline_entries = load_baseline(args.baseline) if args.baseline else []
         spec = load_spec(args.spec)
-    except (ValueError, SpecError) as exc:
+    except (ValueError, SpecError, BaselineError) as exc:
         print(f"specsentinel: {exc}", file=sys.stderr)
         return 2
 
@@ -113,6 +125,16 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, SpecError) as exc:
         print(f"specsentinel: {exc}", file=sys.stderr)
         return 2
+
+    if args.baseline:
+        apply_baseline(report, baseline_entries)
+
+    if args.write_baseline:
+        try:
+            write_baseline(args.write_baseline, collect_entries(report))
+        except BaselineError as exc:
+            print(f"specsentinel: {exc}", file=sys.stderr)
+            return 2
 
     render = render_json if args.format == "json" else render_text
     print(render(report, args.spec, args.url))

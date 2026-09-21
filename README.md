@@ -122,6 +122,8 @@ specsentinel SPEC --url BASE_URL [options]
   -H, --header 'N: v'    header sent with every request, repeatable
   --param NAME=VALUE     value for a path or query parameter, repeatable
   --params-file FILE     YAML or JSON file with parameter values
+  --baseline FILE        ignore findings recorded in FILE
+  --write-baseline FILE  write all current findings to FILE
   --timeout SECONDS      wait per request, default 10
   --strict               treat warnings as drift
   --format text|json     output format, default text
@@ -147,18 +149,21 @@ included in the output.
     "drift": 1,
     "skipped": 1,
     "failed": 0,
-    "counts": {"error": 1, "warning": 1}
+    "counts": {"error": 1, "warning": 1},
+    "baselined": 0
   },
   "findings": [
     {"code": "MISSING_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "error"},
     {"code": "UNDOCUMENTED_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "warning"}
   ],
+  "fixed": [],
   "operations": [
     {
       "method": "GET",
       "path": "/pets/{petId}",
       "status": 200,
       "state": "DRIFT",
+      "baselined": 0,
       "findings": [
         {"severity": "error", "code": "MISSING_FIELD", "location": "body.name", "message": "required field is missing in the response"},
         {"severity": "warning", "code": "UNDOCUMENTED_FIELD", "location": "body.extra", "message": "field is not documented in the spec"}
@@ -167,6 +172,27 @@ included in the output.
   ]
 }
 ```
+
+## Adopt it in an existing project
+
+An API that already drifts makes the first run red. Record what is there today as
+a baseline, then only new drift fails:
+
+```
+specsentinel openapi.yaml --url https://staging.example.com --write-baseline baseline.json
+specsentinel openapi.yaml --url https://staging.example.com --baseline baseline.json
+```
+
+The first command writes every current finding to `baseline.json` and exits 1,
+because nothing is accepted yet. The second run ignores those findings: they are
+counted as `baselined` and no longer affect the exit code. New findings behave as
+before, so an error still fails and a warning still needs `--strict`.
+
+A finding is matched by method, path, code and location, not by its message, so
+editing a message does not invalidate the baseline. Baseline findings that no
+longer occur are listed as `fixed`, which tells you what can be removed. Re-run
+`--write-baseline` to refresh the file after fixing drift. In `--format json` the
+number is `summary.baselined` and the fixed findings are in the `fixed` list.
 
 ## How requests are built
 

@@ -23,6 +23,7 @@ class OperationResult:
     path: str
     status: int | None = None
     findings: list[Finding] = field(default_factory=list)
+    baselined: list[Finding] = field(default_factory=list)  # accepted, from the baseline
     skipped: str | None = None
     error: str | None = None  # request could not be completed
 
@@ -37,6 +38,12 @@ class OperationResult:
 class Report:
     results: list[OperationResult]
     strict: bool = False
+    baseline_loaded: bool = False
+    fixed: list[dict] = field(default_factory=list)
+
+    @property
+    def baselined_count(self) -> int:
+        return sum(len(r.baselined) for r in self.results)
 
     @property
     def checked(self) -> list[OperationResult]:
