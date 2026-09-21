@@ -153,17 +153,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: b6bs62fhys-jpg/specsentinel@v0.1.2
         with:
-          python-version: "3.12"
-      - run: pip install specsentinel
-      - run: >
-          specsentinel openapi.yaml
-          --url https://staging.example.com
-          --header "Authorization: Bearer ${{ secrets.API_TOKEN }}"
+          spec: openapi.yaml
+          url: https://staging.example.com
+          header: "Authorization: Bearer ${{ secrets.API_TOKEN }}"
 ```
 
-When the API drifts, exit code 1 fails the step and the build goes red.
+The action installs SpecSentinel from PyPI, runs it against your API and
+passes its exit code through unchanged: 0 on match, 1 on drift, 2 if the
+check could not be completed. When the API drifts, exit code 1 fails the
+step and the build goes red.
+
+Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
+`header` (sent with every request, passed through an environment variable and
+never printed), `params_file`, `strict` (default `false`) and
+`python_version` (default `3.12`).
 
 ## Tested against real specifications
 
