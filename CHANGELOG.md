@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-21
 
 ### Added
 
@@ -13,13 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--baseline FILE` accepts those findings, so only new drift fails. Findings
   are matched by method, path, code and location, not by message. Accepted
   findings are counted as `baselined` and no longer affect the exit code.
-  Baseline entries that no longer occur are reported as `fixed`.
+  Baseline entries that no longer occur are reported as `fixed`. A run that
+  writes the baseline exits 0 once the file is written.
 
 ### Changed
 
 - Fatal errors (missing spec, invalid YAML or JSON, no OpenAPI document,
   unreachable target, wrong base URL, timeout, missing path parameter) print a
-  single clear line and exit with code 2 instead of a traceback.
+  single clear line and exit with code 2 instead of a traceback. With
+  `--format json` the failure is also written to stdout as a JSON object.
 
 ## [0.2.0] - 2026-09-21
 
@@ -33,12 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `findings` list next to the per operation details.
 - The GitHub Action accepts a `version` input to install an exact SpecSentinel
   release instead of the latest one.
-
-### Fixed
-
-- `date-time` values are validated with an RFC 3339 regular expression instead
-  of `datetime.fromisoformat`, which rejected valid offsets and fractional
-  seconds.
 
 ## [0.1.2] - 2026-09-21
 
@@ -77,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--format text|json`.
 - A demo server, an example spec, a test suite and a CI workflow.
 
-[Unreleased]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.0...v0.1.1

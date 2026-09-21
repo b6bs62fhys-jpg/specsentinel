@@ -10,12 +10,12 @@ SpecSentinel checks a running API against its OpenAPI document. It calls every G
 ## What it is for
 
 * A CI check that runs on every push or pull request and fails the build when the live API no longer matches its spec.
-* Safe to point at staging or production, because it only reads: it sends GET requests and never changes data.
+* It sends GET requests only. On a well-built API a GET request does not change data, but an API can misuse GET (the Petstore has `GET /user/logout`, for example), so check against staging first.
 * Any OpenAPI 3.x document in YAML or JSON, including `$ref` across files and URLs.
 
 ## What it does not do
 
-* It never sends POST, PUT, PATCH or DELETE, so it cannot create, change or delete data.
+* It never sends POST, PUT, PATCH or DELETE. It does not change data on a well-built API, but a GET request can be misused, so point it at staging first.
 * It does not compare response bodies that are not JSON.
 * It does not test business logic, performance or security, and it is not a mock server or a spec linter.
 * It cannot check a spec on its own: a running API is required.
@@ -34,7 +34,7 @@ specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
 The demo drifts on purpose. Real output:
 
 ```
-SpecSentinel 0.2.0
+SpecSentinel 0.3.0
 Spec:   examples/petstore.yaml
 Target: http://127.0.0.1:8099
 
@@ -132,7 +132,7 @@ included in the output.
 
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "spec": "examples/petstore.yaml",
   "target": "http://127.0.0.1:8099",
   "strict": false,
@@ -176,10 +176,11 @@ specsentinel openapi.yaml --url https://staging.example.com --write-baseline bas
 specsentinel openapi.yaml --url https://staging.example.com --baseline baseline.json
 ```
 
-The first command writes every current finding to `baseline.json` and exits 1,
-because nothing is accepted yet. The second run ignores those findings: they are
-counted as `baselined` and no longer affect the exit code. New findings behave as
-before, so an error still fails and a warning still needs `--strict`.
+The first command writes every current finding to `baseline.json` and exits 0:
+recording the baseline is the goal, so a run that writes the file succeeds. The
+second run ignores those findings: they are counted as `baselined` and no longer
+affect the exit code. New findings behave as before, so an error still fails and
+a warning still needs `--strict`.
 
 A finding is matched by method, path, code and location, not by its message, so
 editing a message does not invalidate the baseline. Baseline findings that no
@@ -229,7 +230,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: b6bs62fhys-jpg/specsentinel@v0.2.0
+      - uses: b6bs62fhys-jpg/specsentinel@v0.3.0
         with:
           spec: openapi.yaml
           url: https://staging.example.com
@@ -245,7 +246,7 @@ Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
 `header` (sent with every request, passed through an environment variable and
 not written to the log), `params_file`, `strict` (default `false`),
 `python_version` (default `3.12`) and `version`. `version` pins the exact
-SpecSentinel release that gets installed, for example `0.2.0`. When it is
+SpecSentinel release that gets installed, for example `0.3.0`. When it is
 empty, the latest release is installed.
 
 ## Tested against real specifications

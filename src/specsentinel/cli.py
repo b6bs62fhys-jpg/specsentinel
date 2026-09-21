@@ -26,6 +26,19 @@ def _one_line(text) -> str:
     return " ".join(str(text).split())
 
 
+def _fatal(message, fmt: str) -> int:
+    """Print a fatal error and return exit code 2.
+
+    The human readable message always goes to stderr. In JSON mode a small
+    object goes to stdout as well, so a machine can read the failure.
+    """
+    text = _one_line(message)
+    print(f"specsentinel: {text}", file=sys.stderr)
+    if fmt == "json":
+        print(json.dumps({"exit_code": 2, "error": text}, indent=2))
+    return 2
+
+
 def _nothing_checked_message(report, base_url: str) -> str:
     if report.failed:
         reason = report.failed[0].error or "unknown error"
@@ -146,31 +159,33 @@ def main(argv: list[str] | None = None) -> int:
         baseline_entries = load_baseline(args.baseline) if args.baseline else []
         spec = load_spec(args.spec)
     except (ValueError, SpecError, BaselineError) as exc:
-        print(f"specsentinel: {_one_line(exc)}", file=sys.stderr)
-        return 2
+        return _fatal(exc, args.format)
 
     try:
         report = run_check(spec, args.url, extra_headers=headers, overrides=overrides,
                            defaults=defaults, per_operation=per_operation,
                            timeout=args.timeout, strict=args.strict)
     except (ValueError, SpecError) as exc:
-        print(f"specsentinel: {_one_line(exc)}", file=sys.stderr)
-        return 2
+        return _fatal(exc, args.format)
 
     if args.baseline:
         apply_baseline(report, baseline_entries)
 
     if _should_collapse(report):
-        print(f"specsentinel: {_one_line(_nothing_checked_message(report, args.url))}",
-              file=sys.stderr)
-        return 2
+        return _fatal(_nothing_checked_message(report, args.url), args.format)
 
     if args.write_baseline:
         try:
-            write_baseline(args.write_baseline, collect_entries(report))
+            entries = collect_entries(report)
+            write_baseline(args.write_baseline, entries)
         except BaselineError as exc:
-            print(f"specsentinel: {_one_line(exc)}", file=sys.stderr)
-            return 2
+            return _fatal(exc, args.format)
+        if args.format == "json":
+            print(json.dumps({"exit_code": 0, "baseline": args.write_baseline,
+                              "findings": len(entries)}, indent=2))
+        else:
+            print(f"Wrote {len(entries)} findings to {args.write_baseline}")
+        return 0
 
     render = render_json if args.format == "json" else render_text
     print(render(report, args.spec, args.url))
