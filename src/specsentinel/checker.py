@@ -221,8 +221,8 @@ def pick_media_type(content: dict, content_type: str):
     return None
 
 
-def check_response(spec: dict, operation: dict, status: int,
-                   headers: dict, body: bytes) -> list[Finding]:
+def _check_response(spec: dict, operation: dict, status: int,
+                    headers: dict, body: bytes) -> list[Finding]:
     """Return every difference between the live response and the operation's spec."""
     responses = deref(spec, operation.get("responses") or {})
     documented = match_response(responses, status)
@@ -270,3 +270,19 @@ def check_response(spec: dict, operation: dict, status: int,
 
     findings = validate_value(spec, schema, data, "body")
     return list(dict.fromkeys(findings))  # drop duplicates, keep order
+
+
+def check_response(spec: dict, operation: dict, status: int,
+                   headers: dict, body: bytes) -> list[Finding]:
+    """Return every difference between the live response and the spec.
+
+    A 5xx answer covered only by the catch all `default` response is
+    reported as a warning: the spec allows it, but it usually means
+    the API is broken.
+    """
+    found = _check_response(spec, operation, status, headers, body)
+    keys = {str(k).upper() for k in (deref(spec, operation.get("responses")) or {})}
+    if 500 <= status < 600 and not keys & {str(status), "5XX"} and "DEFAULT" in keys:
+        msg = f"server error {status} is only covered by the default response"
+        found = [Finding(WARNING, "SERVER_ERROR", "status", msg)] + found
+    return found
