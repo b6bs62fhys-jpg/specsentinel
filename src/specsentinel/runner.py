@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import fnmatch
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -172,7 +173,8 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
               per_operation: dict[str, dict] | None = None,
               include: list[str] | None = None,
               exclude: list[str] | None = None,
-              timeout: float = 10.0, strict: bool = False) -> Report:
+              timeout: float = 10.0, strict: bool = False,
+              delay: float = 0.0) -> Report:
     """Check every GET operation.
 
     Parameter values are taken in this order, later wins:
@@ -180,7 +182,7 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
 
     ``include`` and ``exclude`` are path patterns with ``*`` as a wildcard.
     Operations that do not match are reported as SKIPPED and do not affect the
-    exit code.
+    exit code. ``delay`` is the pause in seconds between two requests.
     """
     results: list[OperationResult] = []
     overrides = overrides or {}
@@ -188,6 +190,7 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
     per_operation = per_operation or {}
     include = include or []
     exclude = exclude or []
+    requests_sent = 0
 
     for path, path_item, operation in iter_get_operations(spec):
         result = OperationResult(method="GET", path=path)
@@ -215,6 +218,10 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
         }
         headers.update(param_headers)
         headers.update(extra_headers or {})
+
+        if delay and requests_sent:
+            time.sleep(delay)
+        requests_sent += 1
 
         try:
             status, response_headers, body = fetch(url, headers, timeout)

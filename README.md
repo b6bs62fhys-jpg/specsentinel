@@ -120,6 +120,7 @@ specsentinel SPEC --url BASE_URL [options]
   --baseline FILE        ignore findings recorded in FILE
   --write-baseline FILE  write all current findings to FILE
   --timeout SECONDS      wait per request, default 10
+  --delay SECONDS        wait between requests, default 0
   --strict               treat warnings as drift
   --format text|json     output format, default text
   --version
@@ -199,7 +200,7 @@ specsentinel openapi.yaml --url https://staging.example.com --exclude /user/logo
 specsentinel openapi.yaml --url https://staging.example.com --include '/pets*' --exclude '/pets/{petId}'
 ```
 
-Without `--include` every operation is checked. With `--include` only the matching ones are, and `--exclude` takes paths out again. An excluded operation shows as SKIPPED with the reason `excluded`, does not change the exit code and appears in the JSON output. Use it for an operation such as `GET /user/logout` that is documented but has a side effect.
+Without `--include` every operation is checked. With `--include` only the matching ones are, and `--exclude` takes paths out again. An excluded operation shows as SKIPPED with the reason `excluded`, does not change the exit code and appears in the JSON output. Use it for an operation such as `GET /user/logout` that is documented but has a side effect. Against staging or an API you do not own, combine `--exclude` with `--delay` to put a pause between requests.
 
 ## How requests are built
 

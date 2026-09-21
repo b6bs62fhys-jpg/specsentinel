@@ -143,6 +143,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="write all current findings to FILE as a JSON baseline")
     parser.add_argument("--timeout", type=float, default=10.0,
                         help="seconds to wait per request (default 10)")
+    parser.add_argument("--delay", type=float, default=0.0,
+                        help="seconds to wait between requests (default 0)")
     parser.add_argument("--strict", action="store_true",
                         help="treat warnings, such as undocumented fields, as drift")
     parser.add_argument("--format", choices=["text", "json"], default="text",
@@ -169,7 +171,8 @@ def main(argv: list[str] | None = None) -> int:
         report = run_check(spec, args.url, extra_headers=headers, overrides=overrides,
                            defaults=defaults, per_operation=per_operation,
                            include=args.include, exclude=args.exclude,
-                           timeout=args.timeout, strict=args.strict)
+                           timeout=args.timeout, strict=args.strict,
+                           delay=args.delay)
     except (ValueError, SpecError) as exc:
         return _fatal(exc, args.format)
 
