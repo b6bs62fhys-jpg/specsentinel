@@ -122,7 +122,7 @@ specsentinel SPEC --url BASE_URL [options]
   --timeout SECONDS      wait per request, default 10
   --delay SECONDS        wait between requests, default 0
   --strict               treat warnings as drift
-  --format text|json     output format, default text
+  --format text|json|junit   output format, default text
   --version
 ```
 
@@ -167,6 +167,41 @@ included in the output.
     }
   ]
 }
+```
+
+## JUnit output for CI systems
+
+Use `--format junit` when your CI system parses JUnit XML (GitLab's
+`junit_report`, JUnit plugins for Jenkins, Azure Pipelines and others). The
+output is one `<testcase>` per operation:
+
+* drift and failed requests are a `<failure>` whose text lists each error code
+  and location, for example `MISSING_FIELD at body.name`,
+* a skipped operation is a `<skipped>` element with the reason in `message`,
+* warnings are collected in `<system-out>`,
+* the exit code is unchanged: 0 for a match, 1 for drift, 2 if the check could
+  not be completed.
+
+Header values are never part of the XML. The `<testsuite>` header repeats the
+counts (`tests`, `failures`, `skipped`) so parsers can show the totals:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="SpecSentinel" tests="4" failures="1" errors="0" skipped="1">
+  <testsuite name="specsentinel" tests="4" failures="1" errors="0" skipped="1" time="0">
+    <testcase classname="SpecSentinel" name="GET /health"/>
+    <testcase classname="SpecSentinel" name="GET /pets">
+      <system-out>UNDOCUMENTED_FIELD at body.status: field is ...</system-out>
+    </testcase>
+    <testcase classname="SpecSentinel" name="GET /pets/{petId}">
+      <failure message="3 finding(s): MISSING_FIELD at body.name">MISSING_FIELD at body.name
+TYPE_MISMATCH at body.id</failure>
+    </testcase>
+    <testcase classname="SpecSentinel" name="GET /owners/{ownerId}">
+      <skipped message="no example value for path parameter 'ownerId'"/>
+    </testcase>
+  </testsuite>
+</testsuites>
 ```
 
 ## Adopt it in an existing project
