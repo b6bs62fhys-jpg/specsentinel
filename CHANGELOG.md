@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fatal errors (missing spec, invalid YAML or JSON, no OpenAPI document,
   unreachable target, wrong base URL, timeout, missing path parameter) print a
-  single clear line and exit with code 2 instead of a traceback.
+  single clear line and exit with code 2 instead of a traceback. With
+  `--format json` the failure is also written to stdout as a JSON object.
 
 ## [0.2.0] - 2026-09-21
 
