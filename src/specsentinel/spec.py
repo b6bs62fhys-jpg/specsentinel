@@ -16,6 +16,8 @@ from pathlib import Path
 
 import yaml
 
+from .swagger2 import translate as translate_swagger2
+
 URL_PREFIXES = ("http://", "https://")
 
 
@@ -143,14 +145,21 @@ def load_spec(source: str) -> SpecDocument:
             raise SpecError(f"Could not read spec file {source}: {exc}") from exc
 
     data = _parse(text, "Spec", SpecError)
+    skip_reasons: dict[str, str] = {}
     if "swagger" in data:
-        raise SpecError("Swagger 2.0 is not supported. Use an OpenAPI 3.x document.")
-    if "openapi" not in data:
-        raise SpecError("Spec has no 'openapi' field. Is this an OpenAPI 3.x document?")
+        version = str(data.get("swagger"))
+        if version != "2.0":
+            raise SpecError(f"Unsupported Swagger version {version}. "
+                            "Only Swagger 2.0 is supported.")
+        data, skip_reasons = translate_swagger2(data)
+    elif "openapi" not in data:
+        raise SpecError("Spec has no 'openapi' or 'swagger' field. "
+                        "Is this an OpenAPI 3.x or Swagger 2.0 document?")
 
     doc = SpecDocument(data)
     doc._source = source
     doc._resolver = _Resolver(doc)
+    doc._skip_reasons = skip_reasons
     return doc
 
 

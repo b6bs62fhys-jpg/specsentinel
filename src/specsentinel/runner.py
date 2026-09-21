@@ -190,6 +190,7 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
     per_operation = per_operation or {}
     include = include or []
     exclude = exclude or []
+    skip_reasons = getattr(spec, "_skip_reasons", {})
     requests_sent = 0
 
     for path, path_item, operation in iter_get_operations(spec):
@@ -197,6 +198,9 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
         results.append(result)
         if not is_selected(path, include, exclude):
             result.skipped = "excluded"
+            continue
+        if path in skip_reasons:
+            result.skipped = skip_reasons[path]
             continue
         merged = {**defaults, **per_operation.get(f"GET {path}", {}), **overrides}
         try:

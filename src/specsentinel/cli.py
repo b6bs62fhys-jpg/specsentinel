@@ -125,7 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "Exit code 0 means they match, 1 means drift, 2 means the check "
                     "could not be completed.",
     )
-    parser.add_argument("spec", help="path or URL of the OpenAPI 3.x document (YAML or JSON)")
+    parser.add_argument("spec", help="path or URL of the OpenAPI 3.x or Swagger 2.0 document (YAML or JSON)")
     parser.add_argument("--url", required=True, help="base URL of the running API")
     parser.add_argument("-H", "--header", action="append", default=[], metavar="'Name: value'",
                         help="header sent with every request, repeatable (for example auth)")

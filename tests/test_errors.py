@@ -62,7 +62,7 @@ def test_not_an_openapi_document(capsys, tmp_path):
     code, out = run(capsys, str(spec), "--url", "http://127.0.0.1:1")
     assert code == 2
     assert_single_clear_line(out)
-    assert "no 'openapi' field" in out.err
+    assert "no 'openapi' or 'swagger' field" in out.err
 
 
 def test_target_not_reachable(capsys, spec_path):

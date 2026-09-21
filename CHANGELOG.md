@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `--include PATTERN` and `--exclude PATTERN` select which paths are checked.
+  Both take a path pattern with `*` as a wildcard and can be repeated. An
+  excluded operation is reported as SKIPPED with the reason `excluded`, does
+  not change the exit code and appears in the JSON output.
+- `--delay SECONDS` waits between two requests, default 0.
+- Swagger 2.0 documents are translated to OpenAPI 3 in memory, so paths,
+  path/query/header parameters, responses, `definitions` and top level
+  `responses` can be checked. The base URL still comes from `--url`. An
+  operation that cannot be translated (for example `type: file`, a body
+  parameter or more than one response media type) is reported as SKIPPED with
+  a clear reason instead of stopping the run.
+
 ## [0.3.0] - 2026-09-21
 
 ### Added
@@ -73,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--format text|json`.
 - A demo server, an example spec, a test suite and a CI workflow.
 
+[Unreleased]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.1...v0.1.2

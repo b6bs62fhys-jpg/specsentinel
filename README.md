@@ -11,7 +11,7 @@ SpecSentinel checks a running API against its OpenAPI document. It calls every G
 
 * A CI check that runs on every push or pull request and fails the build when the live API no longer matches its spec.
 * It sends GET requests only. On a well-built API a GET request does not change data, but an API can misuse GET (the Petstore has `GET /user/logout`, for example), so check against staging first.
-* Any OpenAPI 3.x document in YAML or JSON, including `$ref` across files and URLs.
+* Any OpenAPI 3.x or Swagger 2.0 document in YAML or JSON, including `$ref` across files and URLs. A Swagger 2.0 document is translated to OpenAPI 3 in memory, the base URL still comes from `--url`.
 
 ## What it does not do
 
@@ -110,7 +110,7 @@ Warnings do not fail the run. Add `--strict` and they do.
 ```
 specsentinel SPEC --url BASE_URL [options]
 
-  SPEC                   path or URL of the OpenAPI 3.x document, YAML or JSON
+  SPEC                   path or URL of the OpenAPI 3.x or Swagger 2.0 document, YAML or JSON
   --url BASE_URL         base URL of the running API
   -H, --header 'N: v'    header sent with every request, repeatable
   --param NAME=VALUE     value for a path or query parameter, repeatable
