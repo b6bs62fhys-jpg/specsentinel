@@ -94,6 +94,7 @@ Code 2 is deliberately not 0. A pipeline should never turn green because nothing
 | LENGTH_MISMATCH | warning | A string is shorter than `minLength` or longer than `maxLength`. |
 | RANGE_MISMATCH | warning | A number is below `minimum` or above `maximum`. |
 | PATTERN_MISMATCH | warning | A string does not match the `pattern` given in the spec. |
+| MISSING_RESPONSE_HEADER | warning | The spec marks a response header as required but the response does not send it. |
 
 Warnings do not fail the run. Add `--strict` and they do.
 
@@ -239,7 +240,6 @@ This is an early release. Known limits:
 
 * GET operations only
 * JSON response bodies only, other content types are not compared
-* response headers are not compared
 * allOf is merged, oneOf and anyOf pass when any alternative fits
 
 Feedback on which check should come next is very welcome. Open an issue.

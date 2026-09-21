@@ -308,6 +308,23 @@ def pick_media_type(content: dict, content_type: str):
     return None
 
 
+def _check_required_headers(spec: dict, documented: dict, headers: dict) -> list[Finding]:
+    """Warnings for response headers the spec marks as required but are missing."""
+    declared = deref(spec, documented.get("headers") or {})
+    if not isinstance(declared, dict):
+        return []
+    present = {str(name).lower() for name in headers}
+    out: list[Finding] = []
+    for name, header in declared.items():
+        header = deref(spec, header)
+        if isinstance(header, dict) and header.get("required") is True:
+            if str(name).lower() not in present:
+                out.append(Finding(WARNING, "MISSING_RESPONSE_HEADER", f"header.{name}",
+                                   "the spec marks this response header as required "
+                                   "but it is missing"))
+    return out
+
+
 def _check_response(spec: dict, operation: dict, status: int,
                     headers: dict, body: bytes) -> list[Finding]:
     """Return every difference between the live response and the operation's spec."""
@@ -320,43 +337,44 @@ def _check_response(spec: dict, operation: dict, status: int,
                         f"status {status} is not documented (documented: {listed})")]
 
     documented = deref(spec, documented)
+    header_warnings = _check_required_headers(spec, documented, headers)
     content = documented.get("content") or {}
     if not content or status in (204, 304):
-        return []
+        return header_warnings
 
     lowered = {str(k).lower(): v for k, v in headers.items()}
     content_type = lowered.get("content-type", "")
 
     if not content_type:
         if not body:
-            return [Finding(ERROR, "EMPTY_BODY", "body",
+            return header_warnings + [Finding(ERROR, "EMPTY_BODY", "body",
                             "the spec documents a response body but the response was empty")]
-        return [Finding(ERROR, "CONTENT_TYPE_MISSING", "header.Content-Type",
+        return header_warnings + [Finding(ERROR, "CONTENT_TYPE_MISSING", "header.Content-Type",
                         "response has a body but no Content-Type header")]
 
     media = pick_media_type(content, content_type)
     if media is None:
         main = content_type.split(";")[0].strip()
         listed = ", ".join(content) or "none"
-        return [Finding(ERROR, "UNDOCUMENTED_CONTENT_TYPE", "header.Content-Type",
+        return header_warnings + [Finding(ERROR, "UNDOCUMENTED_CONTENT_TYPE", "header.Content-Type",
                         f"content type {main} is not documented (documented: {listed})")]
 
     if "json" not in media.lower():
-        return []  # only JSON bodies are compared in this version
+        return header_warnings  # only JSON bodies are compared in this version
 
     try:
         data = json.loads(body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
-        return [Finding(ERROR, "INVALID_JSON", "body",
+        return header_warnings + [Finding(ERROR, "INVALID_JSON", "body",
                         "response is declared as JSON but the body is not valid JSON")]
 
     media_object = deref(spec, content[media]) or {}
     schema = media_object.get("schema") if isinstance(media_object, dict) else None
     if not schema:
-        return []
+        return header_warnings
 
     findings = validate_value(spec, schema, data, "body")
-    return list(dict.fromkeys(findings))  # drop duplicates, keep order
+    return list(dict.fromkeys(header_warnings + findings))  # drop duplicates, keep order
 
 
 def check_response(spec: dict, operation: dict, status: int,
