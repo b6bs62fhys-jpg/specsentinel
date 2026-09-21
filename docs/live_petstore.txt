@@ -1,0 +1,23 @@
+SpecSentinel 0.1.1
+Spec:   https://petstore3.swagger.io/api/v3/openapi.json
+Target: https://petstore3.swagger.io/api/v3
+
+GET /pet/findByStatus       200  OK
+GET /pet/findByTags         500  OK
+    warning SERVER_ERROR             status
+            server error 500 is only covered by the default response
+GET /pet/{petId}            200  OK
+GET /store/inventory        500  OK
+    warning SERVER_ERROR             status
+            server error 500 is only covered by the default response
+GET /store/order/{orderId}  500  OK
+    warning SERVER_ERROR             status
+            server error 500 is only covered by the default response
+GET /user/login             200  DRIFT
+    error   INVALID_JSON             body
+            response is declared as JSON but the body is not valid JSON
+GET /user/logout            200  OK
+GET /user/{username}        200  OK
+
+8 checked, 1 with drift, 0 skipped, 0 failed
+Result: DRIFT (exit code 1)

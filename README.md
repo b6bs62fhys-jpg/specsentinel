@@ -177,6 +177,10 @@ You can repeat the run yourself with `python tools/spec_smoke.py <spec file or U
 The generator and the checker share the same reading of the schema, so this run shows that the checker raises no false alarms on large real specifications. It does not show that every kind of drift is caught, and it does not replace running SpecSentinel against your own live API.
 
 
+## Found in the wild
+
+On 2026-09-21 SpecSentinel 0.1.1 was run against the public Swagger Petstore. It reported one drift: `GET /user/login` is documented as JSON and answers with `Content-Type: application/json`, but the body is plain text. Three endpoints answered 500 and were reported as `SERVER_ERROR` warnings. The Petstore is a shared demo server, so results may differ. The full output is in `docs/live_petstore.txt`.
+
 ## Limits of this version
 
 This is an early release. Known limits:
