@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import json
+import re
+import uuid
 from dataclasses import dataclass
+from datetime import datetime
+from urllib.parse import urlparse
 
 from .spec import deref
 
@@ -55,6 +59,87 @@ def type_matches(expected: str, value) -> bool:
 
 def enum_contains(options: list, value) -> bool:
     return any(type_of(o) == type_of(value) and o == value for o in options)
+
+
+# --------------------------------------------------------------------------
+# string formats and value constraints (warnings, not errors)
+# --------------------------------------------------------------------------
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _is_datetime(value: str) -> bool:
+    if "T" not in value.upper():
+        return False
+    text = value
+    if text[-1:] in ("Z", "z"):
+        text = text[:-1] + "+00:00"
+    try:
+        datetime.fromisoformat(text)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_uri(value: str) -> bool:
+    parsed = urlparse(value)
+    return bool(parsed.scheme) and (bool(parsed.netloc) or bool(parsed.path))
+
+
+_FORMAT_CHECKS = {
+    "date-time": _is_datetime,
+    "uuid": _is_uuid,
+    "email": lambda v: _EMAIL_RE.fullmatch(v) is not None,
+    "uri": _is_uri,
+}
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _validate_constraints(schema: dict, value, path: str) -> list[Finding]:
+    """Check formats, lengths, ranges and patterns. Returns warnings only."""
+    out: list[Finding] = []
+
+    if isinstance(value, str):
+        fmt = schema.get("format")
+        check = _FORMAT_CHECKS.get(fmt) if isinstance(fmt, str) else None
+        if check is not None and not check(value):
+            out.append(Finding(WARNING, "FORMAT_MISMATCH", path,
+                               f"value {json.dumps(value)} does not match format {fmt}"))
+        if isinstance(schema.get("minLength"), int) and len(value) < schema["minLength"]:
+            out.append(Finding(WARNING, "LENGTH_MISMATCH", path,
+                               f"string is shorter than minLength {schema['minLength']}"))
+        if isinstance(schema.get("maxLength"), int) and len(value) > schema["maxLength"]:
+            out.append(Finding(WARNING, "LENGTH_MISMATCH", path,
+                               f"string is longer than maxLength {schema['maxLength']}"))
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str):
+            try:
+                if re.search(pattern, value) is None:
+                    out.append(Finding(WARNING, "PATTERN_MISMATCH", path,
+                                       f"string does not match pattern {pattern}"))
+            except re.error:
+                pass  # invalid pattern in the spec, skip the check
+
+    if _is_number(value):
+        if isinstance(schema.get("minimum"), (int, float)) and value < schema["minimum"]:
+            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                               f"number {value} is below minimum {schema['minimum']}"))
+        if isinstance(schema.get("maximum"), (int, float)) and value > schema["maximum"]:
+            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                               f"number {value} is above maximum {schema['maximum']}"))
+
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -155,6 +240,8 @@ def validate_value(spec: dict, schema, value, path: str, depth: int = 0) -> list
     if isinstance(schema.get("enum"), list) and not enum_contains(schema["enum"], value):
         out.append(Finding(ERROR, "ENUM_MISMATCH", path,
                            f"value {json.dumps(value)} is not one of {json.dumps(schema['enum'])}"))
+
+    out.extend(_validate_constraints(schema, value, path))
 
     if isinstance(value, dict):
         out.extend(_validate_object(spec, schema, value, path, depth))
