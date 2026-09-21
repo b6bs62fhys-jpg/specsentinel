@@ -1,5 +1,7 @@
 """Every fatal error must be one clear line, no traceback, exit code 2."""
 import json
+import socket
+import threading
 
 from specsentinel.cli import main
 
@@ -68,7 +70,29 @@ def test_wrong_base_url(capsys, spec_path):
 
 
 def test_timeout(capsys, spec_path):
-    code, out = run(capsys, spec_path, "--url", "http://10.255.255.1", "--timeout", "0.3")
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", 0))
+    server.listen(8)
+    port = server.getsockname()[1]
+    held = []
+
+    def accept_and_hold():
+        while True:
+            try:
+                conn, _ = server.accept()
+            except OSError:
+                return
+            held.append(conn)
+
+    threading.Thread(target=accept_and_hold, daemon=True).start()
+    try:
+        code, out = run(capsys, spec_path, "--url", f"http://127.0.0.1:{port}",
+                        "--timeout", "0.3")
+    finally:
+        server.close()
+        for conn in held:
+            conn.close()
     assert code == 2
     assert_single_clear_line(out)
     assert "timed out" in out.err
