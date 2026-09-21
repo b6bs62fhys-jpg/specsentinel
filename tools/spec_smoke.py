@@ -122,7 +122,8 @@ def generate(spec: dict, schema, depth: int = 0, refs: tuple = ()):
     if t == "string":
         fmt = schema.get("format")
         return {"date-time": "2020-01-01T00:00:00Z", "date": "2020-01-01",
-                "uri": "https://example.com", "email": "a@example.com"}.get(fmt, "x")
+                "uri": "https://example.com", "email": "a@example.com",
+                "uuid": "00000000-0000-0000-0000-000000000000"}.get(fmt, "x")
     if t == "integer":
         return int(schema["minimum"]) if schema.get("minimum") is not None else 1
     if t == "number":

@@ -90,6 +90,11 @@ Code 2 is deliberately not 0. A pipeline should never turn green because nothing
 | NO_SCHEMA_MATCH | error | A value fits none of the oneOf or anyOf alternatives. |
 | SERVER_ERROR | warning | The API answered 5xx and the spec only covers it through `default`. Allowed by the spec, but usually a sign the API is broken. `--strict` turns it into a failure. |
 | UNDOCUMENTED_FIELD | warning | A field is returned that the spec does not describe. An error when the schema sets `additionalProperties: false`. |
+| FORMAT_MISMATCH | warning | A string does not match its `format`: `date-time`, `uuid`, `email` or `uri`. |
+| LENGTH_MISMATCH | warning | A string is shorter than `minLength` or longer than `maxLength`. |
+| RANGE_MISMATCH | warning | A number is below `minimum` or above `maximum`. |
+| PATTERN_MISMATCH | warning | A string does not match the `pattern` given in the spec. |
+| MISSING_RESPONSE_HEADER | warning | The spec marks a response header as required but the response does not send it. |
 
 Warnings do not fail the run. Add `--strict` and they do.
 
@@ -109,7 +114,45 @@ specsentinel SPEC --url BASE_URL [options]
   --version
 ```
 
-Use `--format json` when another tool should read the result.
+Use `--format json` when another tool should read the result. The output is a
+single JSON document with `exit_code`, a `summary` with the operation counts
+and `counts` per severity (`error`/`warning`), a flat `findings` list (each
+entry is `code`, `method`, `path` and `severity`) and one `operations` entry
+per checked operation with its detailed findings. Header values are never
+included in the output.
+
+```json
+{
+  "version": "0.1.2",
+  "spec": "examples/petstore.yaml",
+  "target": "http://127.0.0.1:8099",
+  "strict": false,
+  "exit_code": 1,
+  "summary": {
+    "checked": 4,
+    "drift": 1,
+    "skipped": 1,
+    "failed": 0,
+    "counts": {"error": 1, "warning": 1}
+  },
+  "findings": [
+    {"code": "MISSING_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "error"},
+    {"code": "UNDOCUMENTED_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "warning"}
+  ],
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/pets/{petId}",
+      "status": 200,
+      "state": "DRIFT",
+      "findings": [
+        {"severity": "error", "code": "MISSING_FIELD", "location": "body.name", "message": "required field is missing in the response"},
+        {"severity": "warning", "code": "UNDOCUMENTED_FIELD", "location": "body.extra", "message": "field is not documented in the spec"}
+      ]
+    }
+  ]
+}
+```
 
 ## How requests are built
 
@@ -167,8 +210,10 @@ step and the build goes red.
 
 Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
 `header` (sent with every request, passed through an environment variable and
-not written to the log), `params_file`, `strict` (default `false`) and
-`python_version` (default `3.12`).
+not written to the log), `params_file`, `strict` (default `false`),
+`python_version` (default `3.12`) and `version`. `version` pins the exact
+SpecSentinel release that gets installed, for example `0.1.2`. When it is
+empty, the latest release is installed.
 
 ## Tested against real specifications
 
@@ -196,9 +241,7 @@ This is an early release. Known limits:
 
 * GET operations only
 * JSON response bodies only, other content types are not compared
-* response headers are not compared
 * allOf is merged, oneOf and anyOf pass when any alternative fits
-* no string formats, lengths or numeric ranges yet
 
 Feedback on which check should come next is very welcome. Open an issue.
 

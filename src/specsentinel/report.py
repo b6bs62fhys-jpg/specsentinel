@@ -42,6 +42,14 @@ def render_text(report: Report, spec_source: str, base_url: str) -> str:
     return "\n".join(lines)
 
 
+def _severity_counts(report: Report) -> dict:
+    counts = {"error": 0, "warning": 0}
+    for result in report.results:
+        for finding in result.findings:
+            counts[finding.severity] = counts.get(finding.severity, 0) + 1
+    return counts
+
+
 def render_json(report: Report, spec_source: str, base_url: str) -> str:
     payload = {
         "version": __version__,
@@ -54,7 +62,13 @@ def render_json(report: Report, spec_source: str, base_url: str) -> str:
             "drift": len(report.drifted),
             "skipped": len(report.skipped),
             "failed": len(report.failed),
+            "counts": _severity_counts(report),
         },
+        "findings": [
+            {"code": f.code, "method": r.method, "path": r.path, "severity": f.severity}
+            for r in report.results
+            for f in r.findings
+        ],
         "operations": [
             {
                 "method": r.method,

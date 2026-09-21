@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import re
+import uuid
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from .spec import deref
 
@@ -55,6 +58,98 @@ def type_matches(expected: str, value) -> bool:
 
 def enum_contains(options: list, value) -> bool:
     return any(type_of(o) == type_of(value) and o == value for o in options)
+
+
+# --------------------------------------------------------------------------
+# string formats and value constraints (warnings, not errors)
+# --------------------------------------------------------------------------
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+_DATETIME_RE = re.compile(
+    r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})"
+    r"[Tt]"
+    r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
+    r"(?:\.\d+)?"
+    r"(?:[Zz]|[+-]\d{2}:\d{2})?$"
+)
+
+
+def _is_datetime(value: str) -> bool:
+    """RFC 3339 date-time. The fraction may have any number of digits and the
+    timezone may be omitted; both are common in real specs."""
+    match = _DATETIME_RE.match(value)
+    if match is None:
+        return False
+    return (
+        1 <= int(match["month"]) <= 12
+        and 1 <= int(match["day"]) <= 31
+        and 0 <= int(match["hour"]) <= 23
+        and 0 <= int(match["minute"]) <= 59
+        and 0 <= int(match["second"]) <= 60
+    )
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_uri(value: str) -> bool:
+    parsed = urlparse(value)
+    return bool(parsed.scheme) and (bool(parsed.netloc) or bool(parsed.path))
+
+
+_FORMAT_CHECKS = {
+    "date-time": _is_datetime,
+    "uuid": _is_uuid,
+    "email": lambda v: _EMAIL_RE.fullmatch(v) is not None,
+    "uri": _is_uri,
+}
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _validate_constraints(schema: dict, value, path: str) -> list[Finding]:
+    """Check formats, lengths, ranges and patterns. Returns warnings only."""
+    out: list[Finding] = []
+
+    if isinstance(value, str):
+        fmt = schema.get("format")
+        check = _FORMAT_CHECKS.get(fmt) if isinstance(fmt, str) else None
+        if check is not None and not check(value):
+            out.append(Finding(WARNING, "FORMAT_MISMATCH", path,
+                               f"value {json.dumps(value)} does not match format {fmt}"))
+        if isinstance(schema.get("minLength"), int) and len(value) < schema["minLength"]:
+            out.append(Finding(WARNING, "LENGTH_MISMATCH", path,
+                               f"string is shorter than minLength {schema['minLength']}"))
+        if isinstance(schema.get("maxLength"), int) and len(value) > schema["maxLength"]:
+            out.append(Finding(WARNING, "LENGTH_MISMATCH", path,
+                               f"string is longer than maxLength {schema['maxLength']}"))
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str):
+            try:
+                if re.search(pattern, value) is None:
+                    out.append(Finding(WARNING, "PATTERN_MISMATCH", path,
+                                       f"string does not match pattern {pattern}"))
+            except re.error:
+                pass  # invalid pattern in the spec, skip the check
+
+    if _is_number(value):
+        if isinstance(schema.get("minimum"), (int, float)) and value < schema["minimum"]:
+            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                               f"number {value} is below minimum {schema['minimum']}"))
+        if isinstance(schema.get("maximum"), (int, float)) and value > schema["maximum"]:
+            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                               f"number {value} is above maximum {schema['maximum']}"))
+
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -156,6 +251,8 @@ def validate_value(spec: dict, schema, value, path: str, depth: int = 0) -> list
         out.append(Finding(ERROR, "ENUM_MISMATCH", path,
                            f"value {json.dumps(value)} is not one of {json.dumps(schema['enum'])}"))
 
+    out.extend(_validate_constraints(schema, value, path))
+
     if isinstance(value, dict):
         out.extend(_validate_object(spec, schema, value, path, depth))
     elif isinstance(value, list):
@@ -221,6 +318,23 @@ def pick_media_type(content: dict, content_type: str):
     return None
 
 
+def _check_required_headers(spec: dict, documented: dict, headers: dict) -> list[Finding]:
+    """Warnings for response headers the spec marks as required but are missing."""
+    declared = deref(spec, documented.get("headers") or {})
+    if not isinstance(declared, dict):
+        return []
+    present = {str(name).lower() for name in headers}
+    out: list[Finding] = []
+    for name, header in declared.items():
+        header = deref(spec, header)
+        if isinstance(header, dict) and header.get("required") is True:
+            if str(name).lower() not in present:
+                out.append(Finding(WARNING, "MISSING_RESPONSE_HEADER", f"header.{name}",
+                                   "the spec marks this response header as required "
+                                   "but it is missing"))
+    return out
+
+
 def _check_response(spec: dict, operation: dict, status: int,
                     headers: dict, body: bytes) -> list[Finding]:
     """Return every difference between the live response and the operation's spec."""
@@ -233,43 +347,44 @@ def _check_response(spec: dict, operation: dict, status: int,
                         f"status {status} is not documented (documented: {listed})")]
 
     documented = deref(spec, documented)
+    header_warnings = _check_required_headers(spec, documented, headers)
     content = documented.get("content") or {}
     if not content or status in (204, 304):
-        return []
+        return header_warnings
 
     lowered = {str(k).lower(): v for k, v in headers.items()}
     content_type = lowered.get("content-type", "")
 
     if not content_type:
         if not body:
-            return [Finding(ERROR, "EMPTY_BODY", "body",
+            return header_warnings + [Finding(ERROR, "EMPTY_BODY", "body",
                             "the spec documents a response body but the response was empty")]
-        return [Finding(ERROR, "CONTENT_TYPE_MISSING", "header.Content-Type",
+        return header_warnings + [Finding(ERROR, "CONTENT_TYPE_MISSING", "header.Content-Type",
                         "response has a body but no Content-Type header")]
 
     media = pick_media_type(content, content_type)
     if media is None:
         main = content_type.split(";")[0].strip()
         listed = ", ".join(content) or "none"
-        return [Finding(ERROR, "UNDOCUMENTED_CONTENT_TYPE", "header.Content-Type",
+        return header_warnings + [Finding(ERROR, "UNDOCUMENTED_CONTENT_TYPE", "header.Content-Type",
                         f"content type {main} is not documented (documented: {listed})")]
 
     if "json" not in media.lower():
-        return []  # only JSON bodies are compared in this version
+        return header_warnings  # only JSON bodies are compared in this version
 
     try:
         data = json.loads(body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
-        return [Finding(ERROR, "INVALID_JSON", "body",
+        return header_warnings + [Finding(ERROR, "INVALID_JSON", "body",
                         "response is declared as JSON but the body is not valid JSON")]
 
     media_object = deref(spec, content[media]) or {}
     schema = media_object.get("schema") if isinstance(media_object, dict) else None
     if not schema:
-        return []
+        return header_warnings
 
     findings = validate_value(spec, schema, data, "body")
-    return list(dict.fromkeys(findings))  # drop duplicates, keep order
+    return list(dict.fromkeys(header_warnings + findings))  # drop duplicates, keep order
 
 
 def check_response(spec: dict, operation: dict, status: int,
