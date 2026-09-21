@@ -1,4 +1,4 @@
-name: SpecSentinel
+name: SpecSentinel API Drift Check
 description: >-
   Compare a running API with its OpenAPI 3.x spec and report drift. The exit
   code of SpecSentinel is passed through unchanged: 0 on match, 1 on drift,
@@ -14,8 +14,8 @@ inputs:
   header:
     description: >-
       Header sent with every request, for example "Authorization: Bearer ...".
-      The value is passed through an environment variable, it is never written
-      to the command line or the workflow log.
+      The header is passed through an environment variable and is not written
+      to the log.
     required: false
     default: ""
   params_file:

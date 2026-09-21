@@ -167,7 +167,7 @@ step and the build goes red.
 
 Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
 `header` (sent with every request, passed through an environment variable and
-never printed), `params_file`, `strict` (default `false`) and
+not written to the log), `params_file`, `strict` (default `false`) and
 `python_version` (default `3.12`).
 
 ## Tested against real specifications
