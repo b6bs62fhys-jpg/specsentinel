@@ -1,0 +1,49 @@
+name: Action smoke test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start drifting demo API
+        run: |
+          (python examples/demo_server.py --port 8099 >/dev/null 2>&1 &)
+          sleep 2
+
+      - name: Action must fail when the API drifts (exit code 1 passes through)
+        id: drift
+        continue-on-error: true
+        uses: ./
+        with:
+          spec: examples/petstore.yaml
+          url: http://127.0.0.1:8099
+          header: "X-SpecSentinel-Test: drift"
+
+      - name: Confirm the drifting run reported drift
+        if: always()
+        run: |
+          test "${{ steps.drift.outcome }}" = "failure"
+          echo "Verified: the drifting API failed the step (passthrough of exit code 1)."
+
+      - name: Start conforming demo API
+        run: |
+          (python examples/demo_server.py --conform --port 8098 >/dev/null 2>&1 &)
+          sleep 2
+
+      - name: Action must pass when the API matches (exit code 0)
+        id: match
+        uses: ./
+        with:
+          spec: examples/petstore.yaml
+          url: http://127.0.0.1:8098
+
+      - name: Confirm the matching run passed
+        if: always()
+        run: |
+          test "${{ steps.match.outcome }}" = "success"
+          echo "Verified: the matching API passed the step (exit code 0)."

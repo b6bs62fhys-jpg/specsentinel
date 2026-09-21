@@ -1,0 +1,58 @@
+name: SpecSentinel API Drift Check
+description: >-
+  Compare a running API with its OpenAPI 3.x spec and report drift. The exit
+  code of SpecSentinel is passed through unchanged: 0 on match, 1 on drift,
+  2 if the check could not be completed. That makes the whole comparison a
+  single step in a workflow.
+inputs:
+  spec:
+    description: Path or URL of the OpenAPI 3.x document (YAML or JSON).
+    required: true
+  url:
+    description: Base URL of the running API.
+    required: true
+  header:
+    description: >-
+      Header sent with every request, for example "Authorization: Bearer ...".
+      The header is passed through an environment variable and is not written
+      to the log.
+    required: false
+    default: ""
+  params_file:
+    description: YAML or JSON file with parameter values (see the README).
+    required: false
+    default: ""
+  strict:
+    description: Treat warnings, such as undocumented fields, as drift.
+    required: false
+    default: "false"
+  python_version:
+    description: Python version to install SpecSentinel with.
+    required: false
+    default: "3.12"
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Install SpecSentinel
+      shell: bash
+      run: python -m pip install specsentinel
+
+    - name: Check API against spec
+      shell: bash
+      env:
+        SENTINEL_SPEC: ${{ inputs.spec }}
+        SENTINEL_URL: ${{ inputs.url }}
+        SENTINEL_HEADER: ${{ inputs.header }}
+        SENTINEL_PARAMS_FILE: ${{ inputs.params_file }}
+        SENTINEL_STRICT: ${{ inputs.strict }}
+      run: |
+        args=(--url "$SENTINEL_URL")
+        if [ -n "$SENTINEL_HEADER" ]; then args+=(--header "$SENTINEL_HEADER"); fi
+        if [ -n "$SENTINEL_PARAMS_FILE" ]; then args+=(--params-file "$SENTINEL_PARAMS_FILE"); fi
+        if [ "$SENTINEL_STRICT" = "true" ]; then args+=(--strict); fi
+        specsentinel "$SENTINEL_SPEC" "${args[@]}"
