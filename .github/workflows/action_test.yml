@@ -47,3 +47,18 @@ jobs:
         run: |
           test "${{ steps.match.outcome }}" = "success"
           echo "Verified: the matching API passed the step (exit code 0)."
+
+      - name: Action must pass with a pinned SpecSentinel version
+        id: pinned
+        uses: ./
+        with:
+          spec: examples/petstore.yaml
+          url: http://127.0.0.1:8098
+          version: "0.1.1"
+
+      - name: Confirm the pinned version was installed
+        if: always()
+        run: |
+          test "${{ steps.pinned.outcome }}" = "success"
+          test "$(specsentinel --version)" = "specsentinel 0.1.1"
+          echo "Verified: the action installed exactly the pinned version."
