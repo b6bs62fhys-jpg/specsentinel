@@ -30,6 +30,19 @@ jobs:
           test "${{ steps.drift.outcome }}" = "failure"
           echo "Verified: the drifting API failed the step (passthrough of exit code 1)."
 
+      - name: Confirm the summary was written with drift numbers
+        if: always()
+        run: |
+          test -f "$GITHUB_STEP_SUMMARY"
+          grep -q "Result: DRIFT (exit code 1)" "$GITHUB_STEP_SUMMARY"
+          grep -q "Checked: 4" "$GITHUB_STEP_SUMMARY"
+          grep -q "Drift: 2" "$GITHUB_STEP_SUMMARY"
+          grep -q "Skipped: 1" "$GITHUB_STEP_SUMMARY"
+          grep -qF "MISSING_FIELD" "$GITHUB_STEP_SUMMARY"
+          grep -q "`GET` `/pets/{petId}`" "$GITHUB_STEP_SUMMARY"
+          ! grep -q "X-SpecSentinel-Test" "$GITHUB_STEP_SUMMARY"
+          echo "Verified: the summary lists result, counts, the first findings and no header values."
+
       - name: Start conforming demo API
         run: |
           (python examples/demo_server.py --conform --port 8098 >/dev/null 2>&1 &)
@@ -47,6 +60,13 @@ jobs:
         run: |
           test "${{ steps.match.outcome }}" = "success"
           echo "Verified: the matching API passed the step (exit code 0)."
+
+      - name: Confirm the matching run wrote a clean summary
+        if: always()
+        run: |
+          grep -q "Result: MATCH (exit code 0)" "$GITHUB_STEP_SUMMARY"
+          grep -q "Drift: 0" "$GITHUB_STEP_SUMMARY"
+          echo "Verified: the matching run summary lists MATCH with zero drift."
 
       - name: Action must pass with a pinned SpecSentinel version
         id: pinned

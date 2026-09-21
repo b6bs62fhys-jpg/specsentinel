@@ -289,7 +289,10 @@ jobs:
 The action installs SpecSentinel from PyPI, runs it against your API and
 passes its exit code through unchanged: 0 on match, 1 on drift, 2 if the
 check could not be completed. When the API drifts, exit code 1 fails the
-step and the build goes red.
+step and the build goes red. After every run it writes a short summary to
+`$GITHUB_STEP_SUMMARY`: the result, the `checked`/`drift`/`skipped`/
+`baselined` counts and the first 20 findings (code, method and path) - header
+values never appear in it.
 
 Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
 `header` (sent with every request, passed through an environment variable and
