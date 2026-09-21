@@ -88,6 +88,7 @@ Code 2 is deliberately not 0. A pipeline should never turn green because nothing
 | INVALID_JSON | error | The spec promises JSON but the body is not valid JSON. |
 | EMPTY_BODY | error | The spec documents a body but the response is empty. |
 | NO_SCHEMA_MATCH | error | A value fits none of the oneOf or anyOf alternatives. |
+| SERVER_ERROR | warning | The API answered 5xx and the spec only covers it through `default`. Allowed by the spec, but usually a sign the API is broken. `--strict` turns it into a failure. |
 | UNDOCUMENTED_FIELD | warning | A field is returned that the spec does not describe. An error when the schema sets `additionalProperties: false`. |
 
 Warnings do not fail the run. Add `--strict` and they do.

@@ -159,3 +159,15 @@ def test_full_matching_response():
     body = json.dumps({"a": 1}).encode()
     assert check_response(SPEC, _operation(schema), 200,
                           {"Content-Type": "application/json"}, body) == []
+
+
+def test_server_error_only_covered_by_default_is_a_warning():
+    op = {"responses": {"200": {"description": "ok"}, "default": {"description": "e"}}}
+    found = check_response({}, op, 500, {}, b"")
+    assert [(f.severity, f.code) for f in found] == [("warning", "SERVER_ERROR")]
+
+
+def test_documented_server_error_is_not_reported():
+    op = {"responses": {"200": {"description": "ok"}, "503": {"description": "d"}}}
+    assert check_response({}, op, 503, {}, b"") == []
+    assert check_response({}, {"responses": {"5XX": {"description": "e"}}}, 500, {}, b"") == []
