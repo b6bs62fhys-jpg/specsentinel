@@ -33,14 +33,15 @@ jobs:
       - name: Confirm the summary was written with drift numbers
         if: always()
         run: |
-          test -f "$GITHUB_STEP_SUMMARY"
-          grep -q "Result: DRIFT (exit code 1)" "$GITHUB_STEP_SUMMARY"
-          grep -q "Checked: 4" "$GITHUB_STEP_SUMMARY"
-          grep -q "Drift: 2" "$GITHUB_STEP_SUMMARY"
-          grep -q "Skipped: 1" "$GITHUB_STEP_SUMMARY"
-          grep -qF "MISSING_FIELD" "$GITHUB_STEP_SUMMARY"
-          grep -q "`GET` `/pets/{petId}`" "$GITHUB_STEP_SUMMARY"
-          ! grep -q "X-SpecSentinel-Test" "$GITHUB_STEP_SUMMARY"
+          test "${{ steps.drift.outcome }}" = "failure"
+          summary="${{ steps.drift.outputs.summary }}"
+          grep -q "Result: DRIFT (exit code 1)" <<< "$summary"
+          grep -q "Checked: 4" <<< "$summary"
+          grep -q "Drift: 2" <<< "$summary"
+          grep -q "Skipped: 1" <<< "$summary"
+          grep -qF "MISSING_FIELD" <<< "$summary"
+          grep -qF -- "- \`GET\` \`/pets/{petId}\`" <<< "$summary"
+          ! grep -q "X-SpecSentinel-Test" <<< "$summary"
           echo "Verified: the summary lists result, counts, the first findings and no header values."
 
       - name: Start conforming demo API
@@ -64,8 +65,11 @@ jobs:
       - name: Confirm the matching run wrote a clean summary
         if: always()
         run: |
-          grep -q "Result: MATCH (exit code 0)" "$GITHUB_STEP_SUMMARY"
-          grep -q "Drift: 0" "$GITHUB_STEP_SUMMARY"
+          test "${{ steps.match.outcome }}" = "success"
+          summary="${{ steps.match.outputs.summary }}"
+          grep -q "Result: MATCH (exit code 0)" <<< "$summary"
+          grep -q "Drift: 0" <<< "$summary"
+          ! grep -q "X-SpecSentinel-Test" <<< "$summary"
           echo "Verified: the matching run summary lists MATCH with zero drift."
 
       - name: Action must pass with a pinned SpecSentinel version

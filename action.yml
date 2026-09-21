@@ -36,6 +36,13 @@ inputs:
     default: ""
 runs:
   using: composite
+  outputs:
+    summary:
+      description: >-
+        Markdown that was appended to the step summary: the result, the
+        checked/drift/skipped/baselined counts and the first 20 findings
+        (code, method and path). Header values are never included.
+      value: ${{ steps.check.outputs.summary }}
   steps:
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -54,6 +61,7 @@ runs:
         fi
 
     - name: Check API against spec
+      id: check
       shell: bash
       env:
         SENTINEL_SPEC: ${{ inputs.spec }}
@@ -97,5 +105,7 @@ runs:
         if path:
             with open(path, "a", encoding="utf-8") as handle:
                 handle.write("\n".join(lines) + "\n")
+        with open(os.environ.get("GITHUB_OUTPUT", os.devnull), "a", encoding="utf-8") as handle:
+            handle.write("summary<<'SENTINEL_SUMMARY'\n" + "\n".join(lines) + "\nSENTINEL_SUMMARY\n")
         PY
         exit "$code"
