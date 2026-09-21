@@ -206,7 +206,7 @@ Without `--include` every operation is checked. With `--include` only the matchi
 
 SpecSentinel sends GET requests only. Methods that change data could damage the API under test, so they are out of scope by design.
 
-Parameter values come from the spec: `example`, `examples`, the schema `example`, `default`, or the first `enum` value. A path parameter without any of these cannot be filled in automatically. That operation is reported as SKIPPED with the exact `--param` to pass. Skipped operations do not fail the run.
+Parameter values come from `--param` and the params file first. Without one, they fall back to the spec, in this order: the parameter `example`, the `examples` map, the schema `example`, the schema `default`, or the first `enum` value. A path parameter without any of these cannot be filled in automatically. That operation is reported as SKIPPED with the exact `--param` to pass. Skipped operations do not fail the run, and a query parameter without a value is left out of the request.
 
 ### Params file
 
