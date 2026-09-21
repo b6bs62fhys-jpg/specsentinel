@@ -41,7 +41,7 @@ specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
 Real output:
 
 ```
-SpecSentinel 0.1.1
+SpecSentinel 0.1.2
 Spec:   examples/petstore.yaml
 Target: http://127.0.0.1:8099
 
@@ -180,6 +180,10 @@ The generator and the checker share the same reading of the schema, so this run 
 ## Found in the wild
 
 On 2026-09-21 SpecSentinel 0.1.1 was run against the public Swagger Petstore. It reported one drift: `GET /user/login` is documented as JSON and answers with `Content-Type: application/json`, but the body is plain text. Three endpoints answered 500 and were reported as `SERVER_ERROR` warnings. The Petstore is a shared demo server, so results may differ. The full output is in `docs/live_petstore.txt`.
+
+## Security
+
+SpecSentinel follows `$ref` across files and URLs. A spec can make SpecSentinel read files from its own machine and fetch documents from any URL it can reach. Only check specs you trust: review a spec before running it, and only point the tool at specs from sources you control or rely on, just as you would with any code you choose to execute.
 
 ## Limits of this version
 
