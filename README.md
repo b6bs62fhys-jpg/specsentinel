@@ -188,7 +188,6 @@ This is an early release. Known limits:
 * GET operations only
 * JSON response bodies only, other content types are not compared
 * response headers are not compared
-* only local `$ref` references, no references to other files
 * allOf is merged, oneOf and anyOf pass when any alternative fits
 * no string formats, lengths or numeric ranges yet
 

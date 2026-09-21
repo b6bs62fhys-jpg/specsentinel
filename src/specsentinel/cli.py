@@ -106,9 +106,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"specsentinel: {exc}", file=sys.stderr)
         return 2
 
-    report = run_check(spec, args.url, extra_headers=headers, overrides=overrides,
-                       defaults=defaults, per_operation=per_operation,
-                       timeout=args.timeout, strict=args.strict)
+    try:
+        report = run_check(spec, args.url, extra_headers=headers, overrides=overrides,
+                           defaults=defaults, per_operation=per_operation,
+                           timeout=args.timeout, strict=args.strict)
+    except (ValueError, SpecError) as exc:
+        print(f"specsentinel: {exc}", file=sys.stderr)
+        return 2
 
     render = render_json if args.format == "json" else render_text
     print(render(report, args.spec, args.url))
