@@ -41,7 +41,7 @@ specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
 Real output:
 
 ```
-SpecSentinel 0.1.0
+SpecSentinel 0.1.1
 Spec:   examples/petstore.yaml
 Target: http://127.0.0.1:8099
 
