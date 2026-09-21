@@ -5,54 +5,33 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![tests](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml)
 
-Your OpenAPI spec says one thing. Your API does another. SpecSentinel calls the running API, compares every answer with the spec and tells you where they disagree.
+SpecSentinel checks a running API against its OpenAPI document. It calls every GET operation, compares each response with the spec and reports where the two disagree, from missing fields and wrong types to undocumented status codes. The exit code tells a pipeline what happened: 0 for a match, 1 for drift and 2 if the check could not be completed.
 
-It reports three kinds of drift:
+## What it is for
 
-* missing fields
-* wrong data types
-* undocumented status codes
+* A CI check that runs on every push or pull request and fails the build when the live API no longer matches its spec.
+* Safe to point at staging or production, because it only reads: it sends GET requests and never changes data.
+* Any OpenAPI 3.x document in YAML or JSON, including `$ref` across files and URLs.
 
-Exit code 0 means spec and API match. Exit code 1 means drift. Exit code 2 means the check could not be completed. That makes it a one line gate in a CI/CD pipeline.
+## What it does not do
 
-## New in 0.2.0
+* It never sends POST, PUT, PATCH or DELETE, so it cannot create, change or delete data.
+* It does not compare response bodies that are not JSON.
+* It does not test business logic, performance or security, and it is not a mock server or a spec linter.
+* It cannot check a spec on its own: a running API is required.
 
-* More warnings for the values an API returns: string formats (`date-time`,
-  `uuid`, `email`, `uri`), string lengths, numeric ranges and patterns, and
-  required response headers that are missing.
-* `--format json` now adds per severity `counts` and a flat `findings` list
-  next to the per operation details.
-* The GitHub Action takes a `version` input to install an exact SpecSentinel
-  release instead of the latest one.
+## Install and first run
 
-Note for `--strict` users: the new checks are warnings, so a run that used to
-be green can turn red with `--strict`. Review the new findings before enabling
-strict in an existing pipeline.
-
-## Install
-
-Python 3.9 or newer.
+Python 3.9 or newer. The demo API ships with the repository.
 
 ```
 pip install specsentinel
-```
-
-Or from a clone of this repository:
-
-```
-pip install .
-```
-
-## Try it in one minute
-
-The repository ships a demo API that drifts from its spec on purpose.
-
-```
+git clone https://github.com/b6bs62fhys-jpg/specsentinel && cd specsentinel
 python examples/demo_server.py &
 specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
 ```
 
-Real output:
+The demo drifts on purpose. Real output:
 
 ```
 SpecSentinel 0.2.0
@@ -79,6 +58,20 @@ Result: DRIFT (exit code 1)
 ```
 
 Start the demo with `--conform` and the same command ends with `Result: MATCH (exit code 0)`.
+
+## New in 0.2.0
+
+* More warnings for the values an API returns: string formats (`date-time`,
+  `uuid`, `email`, `uri`), string lengths, numeric ranges and patterns, and
+  required response headers that are missing.
+* `--format json` now adds per severity `counts` and a flat `findings` list
+  next to the per operation details.
+* The GitHub Action takes a `version` input to install an exact SpecSentinel
+  release instead of the latest one.
+
+Note for `--strict` users: the new checks are warnings, so a run that used to
+be green can turn red with `--strict`. Review the new findings before enabling
+strict in an existing pipeline.
 
 ## Exit codes
 
