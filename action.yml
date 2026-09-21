@@ -31,7 +31,7 @@ inputs:
     required: false
     default: "3.12"
   version:
-    description: Exact SpecSentinel version to install, for example "0.2.0". When empty, the latest release is installed.
+    description: Exact SpecSentinel version to install, for example "0.3.0". When empty, the latest release is installed.
     required: false
     default: ""
 runs:

@@ -34,7 +34,7 @@ specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
 The demo drifts on purpose. Real output:
 
 ```
-SpecSentinel 0.2.0
+SpecSentinel 0.3.0
 Spec:   examples/petstore.yaml
 Target: http://127.0.0.1:8099
 
@@ -132,7 +132,7 @@ included in the output.
 
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "spec": "examples/petstore.yaml",
   "target": "http://127.0.0.1:8099",
   "strict": false,
@@ -229,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: b6bs62fhys-jpg/specsentinel@v0.2.0
+      - uses: b6bs62fhys-jpg/specsentinel@v0.3.0
         with:
           spec: openapi.yaml
           url: https://staging.example.com
@@ -245,7 +245,7 @@ Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
 `header` (sent with every request, passed through an environment variable and
 not written to the log), `params_file`, `strict` (default `false`),
 `python_version` (default `3.12`) and `version`. `version` pins the exact
-SpecSentinel release that gets installed, for example `0.2.0`. When it is
+SpecSentinel release that gets installed, for example `0.3.0`. When it is
 empty, the latest release is installed.
 
 ## Tested against real specifications

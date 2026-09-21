@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "specsentinel"
-version = "0.2.0"
+version = "0.3.0"
 description = "Detects when a live API drifts from its OpenAPI spec. Exit code 0 on match, 1 on drift, 2 if the check could not run."
 readme = "README.md"
 requires-python = ">=3.9"
