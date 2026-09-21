@@ -109,7 +109,44 @@ specsentinel SPEC --url BASE_URL [options]
   --version
 ```
 
-Use `--format json` when another tool should read the result.
+Use `--format json` when another tool should read the result. The output is a
+single JSON document with `exit_code`, a `summary` with the operation counts
+and `counts` per severity (`error`/`warning`), a flat `findings` list (each
+entry is `code`, `method`, `path` and `severity`) and one `operations` entry
+per checked operation with its detailed findings. Header values are never
+included in the output.
+
+```json
+{
+  "version": "0.1.2",
+  "spec": "examples/petstore.yaml",
+  "target": "http://127.0.0.1:8099",
+  "strict": false,
+  "exit_code": 1,
+  "summary": {
+    "checked": 4,
+    "drift": 2,
+    "skipped": 1,
+    "failed": 0,
+    "counts": {"error": 4, "warning": 1}
+  },
+  "findings": [
+    {"code": "MISSING_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "error"},
+    {"code": "UNDOCUMENTED_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "warning"}
+  ],
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/pets/{petId}",
+      "status": 200,
+      "state": "DRIFT",
+      "findings": [
+        {"severity": "error", "code": "MISSING_FIELD", "location": "body.name", "message": "required field is missing in the response"}
+      ]
+    }
+  ]
+}
+```
 
 ## How requests are built
 
