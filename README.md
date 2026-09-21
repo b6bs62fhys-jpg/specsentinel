@@ -1,5 +1,10 @@
 # SpecSentinel
 
+[![PyPI](https://img.shields.io/pypi/v/specsentinel)](https://pypi.org/project/specsentinel/)
+[![Python](https://img.shields.io/pypi/pyversions/specsentinel)](https://pypi.org/project/specsentinel/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![tests](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml)
+
 Your OpenAPI spec says one thing. Your API does another. SpecSentinel calls the running API, compares every answer with the spec and tells you where they disagree.
 
 It reports three kinds of drift:
@@ -15,7 +20,7 @@ Exit code 0 means spec and API match. Exit code 1 means drift. Exit code 2 means
 Python 3.9 or newer.
 
 ```
-pip install git+https://github.com/b6bs62fhys-jpg/specsentinel
+pip install specsentinel
 ```
 
 Or from a clone of this repository:
@@ -150,7 +155,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install git+https://github.com/b6bs62fhys-jpg/specsentinel
+      - run: pip install specsentinel
       - run: >
           specsentinel openapi.yaml
           --url https://staging.example.com
