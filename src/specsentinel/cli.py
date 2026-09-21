@@ -125,7 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "Exit code 0 means they match, 1 means drift, 2 means the check "
                     "could not be completed.",
     )
-    parser.add_argument("spec", help="path or URL of the OpenAPI 3.x document (YAML or JSON)")
+    parser.add_argument("spec", help="path or URL of the OpenAPI 3.x or Swagger 2.0 document (YAML or JSON)")
     parser.add_argument("--url", required=True, help="base URL of the running API")
     parser.add_argument("-H", "--header", action="append", default=[], metavar="'Name: value'",
                         help="header sent with every request, repeatable (for example auth)")
@@ -133,12 +133,18 @@ def build_parser() -> argparse.ArgumentParser:
                         help="value for a path or query parameter, repeatable")
     parser.add_argument("--params-file", metavar="FILE",
                         help="YAML or JSON file with parameter values (see README)")
+    parser.add_argument("--include", action="append", default=[], metavar="PATTERN",
+                        help="check only paths matching PATTERN, repeatable, * is a wildcard")
+    parser.add_argument("--exclude", action="append", default=[], metavar="PATTERN",
+                        help="skip paths matching PATTERN, repeatable, * is a wildcard")
     parser.add_argument("--baseline", metavar="FILE",
                         help="ignore findings recorded in FILE, so only new drift fails")
     parser.add_argument("--write-baseline", metavar="FILE",
                         help="write all current findings to FILE as a JSON baseline")
     parser.add_argument("--timeout", type=float, default=10.0,
                         help="seconds to wait per request (default 10)")
+    parser.add_argument("--delay", type=float, default=0.0,
+                        help="seconds to wait between requests (default 0)")
     parser.add_argument("--strict", action="store_true",
                         help="treat warnings, such as undocumented fields, as drift")
     parser.add_argument("--format", choices=["text", "json"], default="text",
@@ -164,7 +170,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         report = run_check(spec, args.url, extra_headers=headers, overrides=overrides,
                            defaults=defaults, per_operation=per_operation,
-                           timeout=args.timeout, strict=args.strict)
+                           include=args.include, exclude=args.exclude,
+                           timeout=args.timeout, strict=args.strict,
+                           delay=args.delay)
     except (ValueError, SpecError) as exc:
         return _fatal(exc, args.format)
 

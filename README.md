@@ -11,7 +11,7 @@ SpecSentinel checks a running API against its OpenAPI document. It calls every G
 
 * A CI check that runs on every push or pull request and fails the build when the live API no longer matches its spec.
 * It sends GET requests only. On a well-built API a GET request does not change data, but an API can misuse GET (the Petstore has `GET /user/logout`, for example), so check against staging first.
-* Any OpenAPI 3.x document in YAML or JSON, including `$ref` across files and URLs.
+* Any OpenAPI 3.x or Swagger 2.0 document in YAML or JSON, including `$ref` across files and URLs. A Swagger 2.0 document is translated to OpenAPI 3 in memory, the base URL still comes from `--url`.
 
 ## What it does not do
 
@@ -110,14 +110,17 @@ Warnings do not fail the run. Add `--strict` and they do.
 ```
 specsentinel SPEC --url BASE_URL [options]
 
-  SPEC                   path or URL of the OpenAPI 3.x document, YAML or JSON
+  SPEC                   path or URL of the OpenAPI 3.x or Swagger 2.0 document, YAML or JSON
   --url BASE_URL         base URL of the running API
   -H, --header 'N: v'    header sent with every request, repeatable
   --param NAME=VALUE     value for a path or query parameter, repeatable
   --params-file FILE     YAML or JSON file with parameter values
+  --include PATTERN      check only paths matching PATTERN, repeatable
+  --exclude PATTERN      skip paths matching PATTERN, repeatable
   --baseline FILE        ignore findings recorded in FILE
   --write-baseline FILE  write all current findings to FILE
   --timeout SECONDS      wait per request, default 10
+  --delay SECONDS        wait between requests, default 0
   --strict               treat warnings as drift
   --format text|json     output format, default text
   --version
@@ -187,6 +190,17 @@ editing a message does not invalidate the baseline. Baseline findings that no
 longer occur are listed as `fixed`, which tells you what can be removed. Re-run
 `--write-baseline` to refresh the file after fixing drift. In `--format json` the
 number is `summary.baselined` and the fixed findings are in the `fixed` list.
+
+## Choosing what to check
+
+Not every operation is safe or useful to call. `--include` and `--exclude` take a path pattern with `*` as a wildcard, and both can be repeated:
+
+```
+specsentinel openapi.yaml --url https://staging.example.com --exclude /user/logout
+specsentinel openapi.yaml --url https://staging.example.com --include '/pets*' --exclude '/pets/{petId}'
+```
+
+Without `--include` every operation is checked. With `--include` only the matching ones are, and `--exclude` takes paths out again. An excluded operation shows as SKIPPED with the reason `excluded`, does not change the exit code and appears in the JSON output. Use it for an operation such as `GET /user/logout` that is documented but has a side effect. Against staging or an API you do not own, combine `--exclude` with `--delay` to put a pause between requests.
 
 ## How requests are built
 

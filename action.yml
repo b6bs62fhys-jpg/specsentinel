@@ -1,12 +1,12 @@
 name: SpecSentinel API Drift Check
 description: >-
-  Compare a running API with its OpenAPI 3.x spec and report drift. The exit
+  Compare a running API with its OpenAPI 3.x or Swagger 2.0 spec and report drift. The exit
   code of SpecSentinel is passed through unchanged: 0 on match, 1 on drift,
   2 if the check could not be completed. That makes the whole comparison a
   single step in a workflow.
 inputs:
   spec:
-    description: Path or URL of the OpenAPI 3.x document (YAML or JSON).
+    description: Path or URL of the OpenAPI 3.x or Swagger 2.0 document (YAML or JSON).
     required: true
   url:
     description: Base URL of the running API.

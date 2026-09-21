@@ -1,0 +1,79 @@
+swagger: "2.0"
+info:
+  title: Petstore demo (Swagger 2.0)
+  version: 1.0.0
+produces:
+  - application/json
+paths:
+  /health:
+    get:
+      responses:
+        "200":
+          description: Service is up
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+  /pets:
+    get:
+      responses:
+        "200":
+          description: All pets
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/Pet"
+  /pets/{petId}:
+    get:
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          type: integer
+          example: 1
+      responses:
+        "200":
+          description: One pet
+          schema:
+            $ref: "#/definitions/Pet"
+        "404":
+          description: Pet not found
+          schema:
+            $ref: "#/definitions/Error"
+  /stats:
+    get:
+      responses:
+        "200":
+          description: Store statistics
+          schema:
+            type: object
+            required: [total, active]
+            properties:
+              total:
+                type: integer
+              active:
+                type: integer
+definitions:
+  Pet:
+    type: object
+    required: [id, name]
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      tag:
+        type: string
+      status:
+        type: string
+        enum: [available, sold]
+  Error:
+    type: object
+    required: [code, message]
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
