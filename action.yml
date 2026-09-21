@@ -34,13 +34,6 @@ inputs:
     description: Exact SpecSentinel version to install, for example "0.3.0". When empty, the latest release is installed.
     required: false
     default: ""
-outputs:
-  summary:
-    description: >-
-      Markdown that was appended to the step summary: the result, the
-      checked/drift/skipped/baselined counts and the first 20 findings
-      (code, method and path). Header values are never included.
-    value: ${{ steps.check.outputs.summary }}
 runs:
   using: composite
   steps:
@@ -105,7 +98,10 @@ runs:
         if path:
             with open(path, "a", encoding="utf-8") as handle:
                 handle.write("\n".join(lines) + "\n")
-        with open(os.environ.get("GITHUB_OUTPUT", os.devnull), "a", encoding="utf-8") as handle:
-            handle.write("summary<<'SENTINEL_SUMMARY'\n" + "\n".join(lines) + "\nSENTINEL_SUMMARY\n")
+        tool_path = os.environ.get("RUNNER_TEMP")
+        if tool_path:
+            tool_path = os.path.join(tool_path, "specsentinel-summary.md")
+            with open(tool_path, "a", encoding="utf-8") as handle:
+                handle.write("\n".join(lines) + "\n")
         PY
         exit "$code"

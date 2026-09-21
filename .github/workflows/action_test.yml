@@ -34,14 +34,15 @@ jobs:
         if: always()
         run: |
           test "${{ steps.drift.outcome }}" = "failure"
-          summary="${{ steps.drift.outputs.summary }}"
-          grep -q "Result: DRIFT (exit code 1)" <<< "$summary"
-          grep -q "Checked: 4" <<< "$summary"
-          grep -q "Drift: 2" <<< "$summary"
-          grep -q "Skipped: 1" <<< "$summary"
-          grep -qF "MISSING_FIELD" <<< "$summary"
-          grep -qF -- "- \`GET\` \`/pets/{petId}\`" <<< "$summary"
-          ! grep -q "X-SpecSentinel-Test" <<< "$summary"
+          summary_file="$RUNNER_TEMP/specsentinel-summary.md"
+          test -s "$summary_file"
+          grep -q "Result: DRIFT (exit code 1)" "$summary_file"
+          grep -q "Checked: 4" "$summary_file"
+          grep -q "Drift: 2" "$summary_file"
+          grep -q "Skipped: 1" "$summary_file"
+          grep -qF "MISSING_FIELD" "$summary_file"
+          grep -qF -- "\`GET\` \`/pets/{petId}\`" "$summary_file"
+          ! grep -q "X-SpecSentinel-Test" "$summary_file"
           echo "Verified: the summary lists result, counts, the first findings and no header values."
 
       - name: Start conforming demo API
@@ -66,10 +67,10 @@ jobs:
         if: always()
         run: |
           test "${{ steps.match.outcome }}" = "success"
-          summary="${{ steps.match.outputs.summary }}"
-          grep -q "Result: MATCH (exit code 0)" <<< "$summary"
-          grep -q "Drift: 0" <<< "$summary"
-          ! grep -q "X-SpecSentinel-Test" <<< "$summary"
+          summary_file="$RUNNER_TEMP/specsentinel-summary.md"
+          grep -q "Result: MATCH (exit code 0)" "$summary_file"
+          grep -q "Drift: 0" "$summary_file"
+          ! grep -q "X-SpecSentinel-Test" "$summary_file"
           echo "Verified: the matching run summary lists MATCH with zero drift."
 
       - name: Action must pass with a pinned SpecSentinel version
