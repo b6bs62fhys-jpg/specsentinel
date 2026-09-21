@@ -16,10 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--delay SECONDS` waits between two requests, default 0.
 - Swagger 2.0 documents are translated to OpenAPI 3 in memory, so paths,
   path/query/header parameters, responses, `definitions` and top level
-  `responses` can be checked. The base URL still comes from `--url`. An
-  operation that cannot be translated (for example `type: file`, a body
-  parameter or more than one response media type) is reported as SKIPPED with
-  a clear reason instead of stopping the run.
+  `responses` can be checked. Each response media type gets its own entry in
+  `content`. The base URL still comes from `--url`. An operation that cannot
+  be translated (for example `type: file` or a body parameter) is reported as
+  SKIPPED with a clear reason instead of stopping the run.
 
 ## [0.3.0] - 2026-09-21
 

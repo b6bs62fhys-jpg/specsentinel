@@ -104,23 +104,88 @@ paths:
     assert params["X-Tenant"]["in"] == "header"
 
 
-def test_more_than_one_media_type_is_skipped(tmp_path, start_server, capsys):
-    spec = write_spec(tmp_path, TWO_PATHS % """\
+def test_operation_produces_xml_and_json_is_checked(tmp_path, start_server):
+    spec = write_spec(tmp_path, """\
+swagger: "2.0"
+info: {title: t, version: '1'}
+produces: [application/json]
+paths:
+  /health:
+    get:
       produces:
+        - application/xml
         - application/json
-        - text/plain
       responses:
         '200':
           description: ok
-          schema: {type: object}
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status: {type: string}
+""")
+    url = start_server(drift=False)
+    assert main([spec, "--url", url]) == 0
+    translated = load_spec(spec)
+    content = translated["paths"]["/health"]["get"]["responses"]["200"]["content"]
+    assert set(content) == {"application/xml", "application/json"}
+    assert content["application/xml"]["schema"]["required"] == ["status"]
+
+
+def test_operation_produces_xml_and_json_reports_drift(tmp_path, start_server, capsys):
+    spec = write_spec(tmp_path, """\
+swagger: "2.0"
+info: {title: t, version: '1'}
+produces: [application/json]
+paths:
+  /health:
+    get:
+      produces:
+        - application/xml
+        - application/json
+      responses:
+        '200':
+          description: ok
+          schema:
+            type: object
+            required: [status, missing]
+            properties:
+              status: {type: string}
+              missing: {type: string}
 """)
     url = start_server(drift=False)
     code = main([spec, "--url", url, "--format", "json"])
-    assert code == 0
+    assert code == 1
     data = json.loads(capsys.readouterr().out)
-    broken = next(op for op in data["operations"] if op["path"] == "/broken")
-    assert broken["state"] == "SKIPPED"
-    assert "media type" in broken["skipped"]
+    health = next(op for op in data["operations"] if op["path"] == "/health")
+    assert health["state"] == "DRIFT"
+    assert any(f["code"] == "MISSING_FIELD" for f in health["findings"])
+
+
+def test_document_produces_xml_and_json_is_checked(tmp_path, start_server):
+    spec = write_spec(tmp_path, """\
+swagger: "2.0"
+info: {title: t, version: '1'}
+produces:
+  - application/xml
+  - application/json
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          description: ok
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status: {type: string}
+""")
+    url = start_server(drift=False)
+    assert main([spec, "--url", url]) == 0
+    translated = load_spec(spec)
+    content = translated["paths"]["/health"]["get"]["responses"]["200"]["content"]
+    assert set(content) == {"application/xml", "application/json"}
 
 
 def test_type_file_is_skipped(tmp_path, start_server, capsys):

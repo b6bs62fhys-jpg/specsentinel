@@ -63,10 +63,6 @@ def translate(data: dict) -> tuple[dict, dict]:
 
 def translate_operation(operation: dict, global_produces) -> tuple[dict, str | None]:
     media_types = _media_types(operation.get("produces", global_produces))
-    if len(media_types) > 1:
-        return {}, ("Swagger 2.0 response has more than one media type "
-                    f"({', '.join(media_types)}), which cannot be translated")
-    media = media_types[0]
     parameters, reason = translate_parameters(operation.get("parameters") or [])
     if reason is not None:
         return {}, reason
@@ -81,7 +77,7 @@ def translate_operation(operation: dict, global_produces) -> tuple[dict, str | N
     if parameters:
         new_operation["parameters"] = parameters
     for status, response in responses.items():
-        new_response, reason = translate_response(response, media)
+        new_response, reason = translate_response(response, media_types)
         if reason is not None:
             return {}, reason
         new_operation["responses"][str(status)] = new_response
@@ -115,7 +111,7 @@ def translate_parameters(raw_parameters) -> tuple[list[dict], str | None]:
     return translated, None
 
 
-def translate_response(response, media: str) -> tuple[dict, str | None]:
+def translate_response(response, media_types: list[str]) -> tuple[dict, str | None]:
     if not isinstance(response, dict):
         return {}, "Swagger 2.0 response is not an object"
     if "$ref" in response:
@@ -126,11 +122,15 @@ def translate_response(response, media: str) -> tuple[dict, str | None]:
     new_response = {"description": response.get("description") or ""}
     schema = response.get("schema")
     if schema is not None:
-        media_object = {"schema": rewrite_refs(schema)}
+        translated_schema = rewrite_refs(schema)
         examples = response.get("examples")
-        if isinstance(examples, dict) and media in examples:
-            media_object["example"] = examples[media]
-        new_response["content"] = {media: media_object}
+        content = {}
+        for media in media_types:
+            media_object = {"schema": translated_schema}
+            if isinstance(examples, dict) and media in examples:
+                media_object["example"] = examples[media]
+            content[media] = media_object
+        new_response["content"] = content
     headers = response.get("headers")
     if isinstance(headers, dict):
         new_headers = {}
