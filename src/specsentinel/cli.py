@@ -16,7 +16,7 @@ from .baseline import (
     load_baseline,
     write_baseline,
 )
-from .report import render_json, render_text
+from .report import render_json, render_junit, render_text
 from .runner import run_check
 from .spec import SpecError, load_spec
 
@@ -147,8 +147,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="seconds to wait between requests (default 0)")
     parser.add_argument("--strict", action="store_true",
                         help="treat warnings, such as undocumented fields, as drift")
-    parser.add_argument("--format", choices=["text", "json"], default="text",
-                        help="output format (default text)")
+    parser.add_argument("--format", choices=["text", "json", "junit"], default="text",
+                        help="output format: text, json or junit (default text)")
     parser.add_argument("--version", action="version", version=f"specsentinel {__version__}")
     return parser
 
@@ -195,8 +195,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Wrote {len(entries)} findings to {args.write_baseline}")
         return 0
 
-    render = render_json if args.format == "json" else render_text
-    print(render(report, args.spec, args.url))
+    if args.format == "json":
+        print(render_json(report, args.spec, args.url))
+    elif args.format == "junit":
+        print(render_junit(report, args.spec, args.url))
+    else:
+        print(render_text(report, args.spec, args.url))
     return report.exit_code()
 
 

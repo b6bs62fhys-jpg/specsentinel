@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from . import __version__
+from .checker import ERROR, WARNING
 from .runner import Report
 
 
@@ -59,6 +60,66 @@ def _severity_counts(report: Report) -> dict:
         for finding in result.findings:
             counts[finding.severity] = counts.get(finding.severity, 0) + 1
     return counts
+
+
+def render_junit(report: Report, spec_source: str, base_url: str) -> str:
+    """Render the report as JUnit XML, one testcase per operation.
+
+    Drift and failed requests are ``failure``, skipped operations are
+    ``skipped`` with their reason, warnings are collected as ``system-out``.
+    Attribute and text content never include request headers or their values.
+    """
+    if not report.results:
+        return '<?xml version="1.0" encoding="utf-8"?>\n<testsuites tests="0" ' \
+               'failures="0" errors="0" skipped="0"/>\n'
+
+    cases: list[str] = []
+    for result in report.results:
+        name = f"{result.method} {result.path}"
+        opening = f'<testcase classname="SpecSentinel" name="{_escape(name)}">'
+        if result.skipped is not None:
+            cases.append(f'{opening}<skipped message="{_escape(result.skipped)}"/>'
+                         "</testcase>")
+            continue
+
+        warnings = [f for f in result.findings if f.severity == WARNING]
+        system_out = ""
+        if warnings:
+            lines = "\n".join(f"{f.code} at {f.location}: {f.message}" for f in warnings)
+            system_out = f"<system-out>{_escape(lines)}</system-out>"
+
+        if result.error is not None:
+            cases.append(f'{opening}<failure message="{_escape(result.error)}">'
+                         f"{_escape(result.error)}</failure>{system_out}</testcase>")
+        elif result.has_drift(report.strict):
+            errors = [f for f in result.findings if f.severity == ERROR]
+            details = "\n".join(f"{f.code} at {f.location}" for f in errors) or "drift"
+            if errors:
+                message = f"{len(errors)} finding(s): {errors[0].code} at {errors[0].location}"
+            else:
+                message = "drift"
+            cases.append(f'{opening}<failure message="{_escape(message)}">'
+                         f"{_escape(details)}</failure>{system_out}</testcase>")
+        else:
+            cases.append(f"{opening}{system_out}</testcase>")
+
+    tests = len(report.results)
+    failures = sum(1 for r in report.results
+                   if r.error is not None or r.has_drift(report.strict))
+    skipped = len(report.skipped)
+    suite = (
+        f'<testsuites name="SpecSentinel" tests="{tests}" failures="{failures}" '
+        f'errors="0" skipped="{skipped}">'
+        f'<testsuite name="specsentinel" tests="{tests}" failures="{failures}" '
+        f'errors="0" skipped="{skipped}" time="0">'
+    )
+    return ('<?xml version="1.0" encoding="utf-8"?>\n' + suite + "\n"
+            + "\n".join(cases) + "\n</testsuite></testsuites>\n")
+
+
+def _escape(text) -> str:
+    return (str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;").replace("'", "&apos;"))
 
 
 def render_json(report: Report, spec_source: str, base_url: str) -> str:

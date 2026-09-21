@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still comes from `--url`. An operation that cannot be translated (for
   example `type: file` or a body parameter) is reported as SKIPPED with a
   clear reason instead of stopping the run.
+- Path and query parameters without a value over `--param` or the params file
+  fall back to the spec: the parameter `example`, the `examples` map, the
+  schema `example`, the schema `default`, or the first `enum` value. Only an
+  operation with none of these is skipped.
+- `--format junit` prints the report as JUnit XML, one testcase per operation:
+  drift and failed requests are a `failure` (code and location in the text),
+  skipped operations are `skipped` with the reason, warnings are collected in
+  `system-out`, and the exit code is unchanged. Header values never appear in
+  the XML.
+- The GitHub Action writes a short summary to `$GITHUB_STEP_SUMMARY` after
+  every run: the result, the `checked`/`drift`/`skipped`/`baselined` counts
+  and the first 20 findings (code, method and path). The step result and exit
+  code are unchanged.
 
 ## [0.3.0] - 2026-09-21
 

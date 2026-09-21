@@ -122,7 +122,7 @@ specsentinel SPEC --url BASE_URL [options]
   --timeout SECONDS      wait per request, default 10
   --delay SECONDS        wait between requests, default 0
   --strict               treat warnings as drift
-  --format text|json     output format, default text
+  --format text|json|junit   output format, default text
   --version
 ```
 
@@ -169,6 +169,41 @@ included in the output.
 }
 ```
 
+## JUnit output for CI systems
+
+Use `--format junit` when your CI system parses JUnit XML (GitLab's
+`junit_report`, JUnit plugins for Jenkins, Azure Pipelines and others). The
+output is one `<testcase>` per operation:
+
+* drift and failed requests are a `<failure>` whose text lists each error code
+  and location, for example `MISSING_FIELD at body.name`,
+* a skipped operation is a `<skipped>` element with the reason in `message`,
+* warnings are collected in `<system-out>`,
+* the exit code is unchanged: 0 for a match, 1 for drift, 2 if the check could
+  not be completed.
+
+Header values are never part of the XML. The `<testsuite>` header repeats the
+counts (`tests`, `failures`, `skipped`) so parsers can show the totals:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="SpecSentinel" tests="4" failures="1" errors="0" skipped="1">
+  <testsuite name="specsentinel" tests="4" failures="1" errors="0" skipped="1" time="0">
+    <testcase classname="SpecSentinel" name="GET /health"/>
+    <testcase classname="SpecSentinel" name="GET /pets">
+      <system-out>UNDOCUMENTED_FIELD at body.status: field is ...</system-out>
+    </testcase>
+    <testcase classname="SpecSentinel" name="GET /pets/{petId}">
+      <failure message="3 finding(s): MISSING_FIELD at body.name">MISSING_FIELD at body.name
+TYPE_MISMATCH at body.id</failure>
+    </testcase>
+    <testcase classname="SpecSentinel" name="GET /owners/{ownerId}">
+      <skipped message="no example value for path parameter 'ownerId'"/>
+    </testcase>
+  </testsuite>
+</testsuites>
+```
+
 ## Adopt it in an existing project
 
 An API that already drifts makes the first run red. Record what is there today as
@@ -206,7 +241,7 @@ Without `--include` every operation is checked. With `--include` only the matchi
 
 SpecSentinel sends GET requests only. Methods that change data could damage the API under test, so they are out of scope by design.
 
-Parameter values come from the spec: `example`, `examples`, the schema `example`, `default`, or the first `enum` value. A path parameter without any of these cannot be filled in automatically. That operation is reported as SKIPPED with the exact `--param` to pass. Skipped operations do not fail the run.
+Parameter values come from `--param` and the params file first. Without one, they fall back to the spec, in this order: the parameter `example`, the `examples` map, the schema `example`, the schema `default`, or the first `enum` value. A path parameter without any of these cannot be filled in automatically. That operation is reported as SKIPPED with the exact `--param` to pass. Skipped operations do not fail the run, and a query parameter without a value is left out of the request.
 
 ### Params file
 
@@ -254,7 +289,10 @@ jobs:
 The action installs SpecSentinel from PyPI, runs it against your API and
 passes its exit code through unchanged: 0 on match, 1 on drift, 2 if the
 check could not be completed. When the API drifts, exit code 1 fails the
-step and the build goes red.
+step and the build goes red. After every run it writes a short summary to
+`$GITHUB_STEP_SUMMARY`: the result, the `checked`/`drift`/`skipped`/
+`baselined` counts and the first 20 findings (code, method and path) - header
+values never appear in it.
 
 Inputs: `spec` (path or URL) and `url` are required. Optional inputs are
 `header` (sent with every request, passed through an environment variable and

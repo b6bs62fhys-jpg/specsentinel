@@ -54,6 +54,7 @@ runs:
         fi
 
     - name: Check API against spec
+      id: check
       shell: bash
       env:
         SENTINEL_SPEC: ${{ inputs.spec }}
@@ -62,8 +63,45 @@ runs:
         SENTINEL_PARAMS_FILE: ${{ inputs.params_file }}
         SENTINEL_STRICT: ${{ inputs.strict }}
       run: |
-        args=(--url "$SENTINEL_URL")
+        args=(--url "$SENTINEL_URL" --format json)
         if [ -n "$SENTINEL_HEADER" ]; then args+=(--header "$SENTINEL_HEADER"); fi
         if [ -n "$SENTINEL_PARAMS_FILE" ]; then args+=(--params-file "$SENTINEL_PARAMS_FILE"); fi
         if [ "$SENTINEL_STRICT" = "true" ]; then args+=(--strict); fi
-        specsentinel "$SENTINEL_SPEC" "${args[@]}"
+
+        output="$(specsentinel "$SENTINEL_SPEC" "${args[@]}")"
+        code=$?
+
+        python - "$output" <<'PY'
+        import json, os, sys
+
+        data = json.loads(sys.argv[1])
+        verdict = {0: "MATCH", 1: "DRIFT", 2: "INCOMPLETE"}.get(data.get("exit_code"), "UNKNOWN")
+        summary = data.get("summary", {})
+        findings = (data.get("findings") or [])[:20]
+
+        lines = [
+            "## SpecSentinel",
+            "",
+            f"- Result: {verdict} (exit code {data.get('exit_code')})",
+            f"- Checked: {summary.get('checked', 0)}",
+            f"- Drift: {summary.get('drift', 0)}",
+            f"- Skipped: {summary.get('skipped', 0)}",
+            f"- Baselined: {summary.get('baselined', 0)}",
+        ]
+        if findings:
+            lines.append("")
+            lines.append("Findings (first 20):")
+            for finding in findings:
+                lines.append(f"- `{finding.get('code')}` `{finding.get('method')}` `{finding.get('path')}`")
+
+        path = os.environ.get("GITHUB_STEP_SUMMARY")
+        if path:
+            with open(path, "a", encoding="utf-8") as handle:
+                handle.write("\n".join(lines) + "\n")
+        tool_path = os.environ.get("RUNNER_TEMP")
+        if tool_path:
+            tool_path = os.path.join(tool_path, "specsentinel-summary.md")
+            with open(tool_path, "a", encoding="utf-8") as handle:
+                handle.write("\n".join(lines) + "\n")
+        PY
+        exit "$code"
