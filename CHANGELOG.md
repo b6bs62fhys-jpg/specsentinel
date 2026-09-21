@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-21
 
 ### Added
 
@@ -33,12 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `findings` list next to the per operation details.
 - The GitHub Action accepts a `version` input to install an exact SpecSentinel
   release instead of the latest one.
-
-### Fixed
-
-- `date-time` values are validated with an RFC 3339 regular expression instead
-  of `datetime.fromisoformat`, which rejected valid offsets and fractional
-  seconds.
 
 ## [0.1.2] - 2026-09-21
 
@@ -77,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--format text|json`.
 - A demo server, an example spec, a test suite and a CI workflow.
 
-[Unreleased]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/b6bs62fhys-jpg/specsentinel/compare/v0.1.0...v0.1.1
