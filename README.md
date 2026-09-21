@@ -10,12 +10,12 @@ SpecSentinel checks a running API against its OpenAPI document. It calls every G
 ## What it is for
 
 * A CI check that runs on every push or pull request and fails the build when the live API no longer matches its spec.
-* Safe to point at staging or production, because it only reads: it sends GET requests and never changes data.
+* It sends GET requests only. On a well-built API a GET request does not change data, but an API can misuse GET (the Petstore has `GET /user/logout`, for example), so check against staging first.
 * Any OpenAPI 3.x document in YAML or JSON, including `$ref` across files and URLs.
 
 ## What it does not do
 
-* It never sends POST, PUT, PATCH or DELETE, so it cannot create, change or delete data.
+* It never sends POST, PUT, PATCH or DELETE. It does not change data on a well-built API, but a GET request can be misused, so point it at staging first.
 * It does not compare response bodies that are not JSON.
 * It does not test business logic, performance or security, and it is not a mock server or a spec linter.
 * It cannot check a spec on its own: a running API is required.
