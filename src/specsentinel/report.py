@@ -45,6 +45,8 @@ def render_text(report: Report, spec_source: str, base_url: str) -> str:
     if report.baseline_loaded:
         summary += f", {report.baselined_count} baselined"
     lines.append(summary)
+    if report.skipped:
+        lines.append("Skipped operations were not checked.")
     code = report.exit_code()
     verdict = {0: "MATCH", 1: "DRIFT", 2: "INCOMPLETE"}[code]
     lines.append(f"Result: {verdict} (exit code {code})")

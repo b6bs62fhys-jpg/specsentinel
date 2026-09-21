@@ -13,6 +13,7 @@ import copy
 _SCHEMA_KEYS = (
     "type", "format", "items", "enum", "default", "minimum", "maximum",
     "minLength", "maxLength", "pattern", "uniqueItems", "multipleOf",
+    "x-nullable",
 )
 
 
@@ -149,11 +150,18 @@ def translate_response(response, media_types: list[str]) -> tuple[dict, str | No
 
 
 def rewrite_refs(value):
-    """Deep copy ``value`` and rewrite every ``$ref`` to its OpenAPI 3 target."""
+    """Deep copy ``value``, rewrite ``$ref`` targets and map x-nullable to
+    nullable, so every schema, nested in properties and items, is handled."""
     if isinstance(value, dict):
         if "$ref" in value and isinstance(value["$ref"], str):
             return {"$ref": rewrite_ref(value["$ref"])}
-        return {key: rewrite_refs(item) for key, item in value.items()}
+        result = {}
+        for key, item in value.items():
+            if key == "x-nullable":
+                result["nullable"] = bool(item)
+            else:
+                result[key] = rewrite_refs(item)
+        return result
     if isinstance(value, list):
         return [rewrite_refs(item) for item in value]
     return copy.deepcopy(value)

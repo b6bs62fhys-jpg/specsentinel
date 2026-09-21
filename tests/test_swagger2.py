@@ -1,5 +1,7 @@
 """Swagger 2.0 documents are translated into the internal OpenAPI 3 shape."""
 import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,34 @@ def write_spec(tmp_path, body):
     path = tmp_path / "swagger.yaml"
     path.write_text(body)
     return str(path)
+
+
+@pytest.fixture
+def start_payload_server():
+    servers = []
+
+    def _start(payload):
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                body = json.dumps(payload).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        servers.append(server)
+        return f"http://127.0.0.1:{server.server_address[1]}"
+
+    yield _start
+    for server in servers:
+        server.shutdown()
+        server.server_close()
 
 
 TWO_PATHS = """\
@@ -275,3 +305,128 @@ paths: {}
 """)
     with pytest.raises(SpecError, match="Only Swagger 2.0"):
         load_spec(path)
+
+
+def test_x_nullable_with_null_is_not_an_error(tmp_path, start_payload_server):
+    spec = write_spec(tmp_path, """\
+swagger: "2.0"
+info: {title: t, version: '1'}
+produces: [application/json]
+paths:
+  /result:
+    get:
+      responses:
+        '200':
+          description: ok
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: {type: string, x-nullable: true}
+""")
+    url = start_payload_server({"name": None})
+    assert main([spec, "--url", url]) == 0
+    translated = load_spec(spec)
+    name = translated["paths"]["/result"]["get"]["responses"]["200"]["content"]
+    assert name["application/json"]["schema"]["properties"]["name"]["nullable"] is True
+
+
+def test_without_x_nullable_null_is_still_an_error(tmp_path, start_payload_server, capsys):
+    spec = write_spec(tmp_path, """\
+swagger: "2.0"
+info: {title: t, version: '1'}
+produces: [application/json]
+paths:
+  /result:
+    get:
+      responses:
+        '200':
+          description: ok
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: {type: string}
+""")
+    url = start_payload_server({"name": None})
+    code = main([spec, "--url", url, "--format", "json"])
+    assert code == 1
+    data = json.loads(capsys.readouterr().out)
+    result = next(op for op in data["operations"] if op["path"] == "/result")
+    assert result["state"] == "DRIFT"
+    assert any(f["code"] == "TYPE_MISMATCH" for f in result["findings"])
+
+
+def test_x_nullable_nested_in_items(tmp_path, start_payload_server):
+    spec = write_spec(tmp_path, """\
+swagger: "2.0"
+info: {title: t, version: '1'}
+produces: [application/json]
+paths:
+  /result:
+    get:
+      responses:
+        '200':
+          description: ok
+          schema:
+            type: array
+            items:
+              type: object
+              required: [tag]
+              properties:
+                tag: {type: string, x-nullable: true}
+""")
+    url = start_payload_server([{"tag": None}])
+    assert main([spec, "--url", url]) == 0
+    translated = load_spec(spec)
+    items = translated["paths"]["/result"]["get"]["responses"]["200"]["content"]
+    prop = items["application/json"]["schema"]["items"]["properties"]["tag"]
+    assert prop["nullable"] is True
+
+
+def test_x_nullable_in_a_definitions_ref(tmp_path, start_payload_server):
+    spec = write_spec(tmp_path, """\
+swagger: "2.0"
+info: {title: t, version: '1'}
+produces: [application/json]
+paths:
+  /result:
+    get:
+      responses:
+        '200':
+          description: ok
+          schema:
+            $ref: '#/definitions/Thing'
+definitions:
+  Thing:
+    type: object
+    required: [name]
+    properties:
+      name: {type: string, x-nullable: true}
+""")
+    url = start_payload_server({"name": None})
+    assert main([spec, "--url", url]) == 0
+    translated = load_spec(spec)
+    name = translated["components"]["schemas"]["Thing"]["properties"]["name"]
+    assert name["nullable"] is True
+
+
+def test_text_output_notes_skipped_operations(spec_path, start_server, capsys):
+    url = start_server(drift=False)
+    code = main([spec_path, "--url", url, "--exclude", "/health"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "3 checked, 0 with drift, 2 skipped, 0 failed" in out
+    assert "Skipped operations were not checked." in out
+    assert out.index("Skipped operations were not checked.") > out.index("3 checked")
+    assert "Result: MATCH" in out
+
+
+def test_text_output_has_no_skip_line_when_nothing_is_skipped(spec_path, start_server,
+                                                              capsys):
+    url = start_server(drift=False)
+    code = main([spec_path, "--url", url, "--param", "ownerId=1"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "0 skipped" in out
+    assert "Skipped operations were not checked." not in out
