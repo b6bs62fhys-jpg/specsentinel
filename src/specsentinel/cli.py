@@ -9,9 +9,47 @@ from pathlib import Path
 import yaml
 
 from . import __version__
+from .baseline import (
+    BaselineError,
+    apply_baseline,
+    collect_entries,
+    load_baseline,
+    write_baseline,
+)
 from .report import render_json, render_text
 from .runner import run_check
 from .spec import SpecError, load_spec
+
+
+def _one_line(text) -> str:
+    """Collapse any exception text to a single line, so errors stay readable."""
+    return " ".join(str(text).split())
+
+
+def _nothing_checked_message(report, base_url: str) -> str:
+    if report.failed:
+        reason = report.failed[0].error or "unknown error"
+        if reason.startswith("spec problem"):
+            return f"nothing could be checked: {reason}."
+        return (f"could not check any operation at {base_url}: {reason}. "
+                "Check --url, the scheme and host, and that the API is reachable.")
+    if report.skipped:
+        return f"nothing could be checked: {report.skipped[0].skipped}."
+    return "the spec has no GET operations to check."
+
+
+def _should_collapse(report) -> bool:
+    """True when nothing was checked and a one line error is clearer than a report.
+
+    When every failure is a spec problem (a bad reference, for example) the
+    report is kept, because it points at the operation that failed.
+    """
+    if report.checked:
+        return False
+    if report.failed and all((r.error or "").startswith("spec problem")
+                             for r in report.failed):
+        return False
+    return True
 
 
 def _parse_headers(values: list[str]) -> dict:
@@ -82,6 +120,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="value for a path or query parameter, repeatable")
     parser.add_argument("--params-file", metavar="FILE",
                         help="YAML or JSON file with parameter values (see README)")
+    parser.add_argument("--baseline", metavar="FILE",
+                        help="ignore findings recorded in FILE, so only new drift fails")
+    parser.add_argument("--write-baseline", metavar="FILE",
+                        help="write all current findings to FILE as a JSON baseline")
     parser.add_argument("--timeout", type=float, default=10.0,
                         help="seconds to wait per request (default 10)")
     parser.add_argument("--strict", action="store_true",
@@ -101,9 +143,10 @@ def main(argv: list[str] | None = None) -> int:
         defaults, per_operation = ({}, {})
         if args.params_file:
             defaults, per_operation = _load_params_file(args.params_file)
+        baseline_entries = load_baseline(args.baseline) if args.baseline else []
         spec = load_spec(args.spec)
-    except (ValueError, SpecError) as exc:
-        print(f"specsentinel: {exc}", file=sys.stderr)
+    except (ValueError, SpecError, BaselineError) as exc:
+        print(f"specsentinel: {_one_line(exc)}", file=sys.stderr)
         return 2
 
     try:
@@ -111,8 +154,23 @@ def main(argv: list[str] | None = None) -> int:
                            defaults=defaults, per_operation=per_operation,
                            timeout=args.timeout, strict=args.strict)
     except (ValueError, SpecError) as exc:
-        print(f"specsentinel: {exc}", file=sys.stderr)
+        print(f"specsentinel: {_one_line(exc)}", file=sys.stderr)
         return 2
+
+    if args.baseline:
+        apply_baseline(report, baseline_entries)
+
+    if _should_collapse(report):
+        print(f"specsentinel: {_one_line(_nothing_checked_message(report, args.url))}",
+              file=sys.stderr)
+        return 2
+
+    if args.write_baseline:
+        try:
+            write_baseline(args.write_baseline, collect_entries(report))
+        except BaselineError as exc:
+            print(f"specsentinel: {_one_line(exc)}", file=sys.stderr)
+            return 2
 
     render = render_json if args.format == "json" else render_text
     print(render(report, args.spec, args.url))

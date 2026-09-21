@@ -5,54 +5,33 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![tests](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml)
 
-Your OpenAPI spec says one thing. Your API does another. SpecSentinel calls the running API, compares every answer with the spec and tells you where they disagree.
+SpecSentinel checks a running API against its OpenAPI document. It calls every GET operation, compares each response with the spec and reports where the two disagree, from missing fields and wrong types to undocumented status codes. The exit code tells a pipeline what happened: 0 for a match, 1 for drift and 2 if the check could not be completed.
 
-It reports three kinds of drift:
+## What it is for
 
-* missing fields
-* wrong data types
-* undocumented status codes
+* A CI check that runs on every push or pull request and fails the build when the live API no longer matches its spec.
+* Safe to point at staging or production, because it only reads: it sends GET requests and never changes data.
+* Any OpenAPI 3.x document in YAML or JSON, including `$ref` across files and URLs.
 
-Exit code 0 means spec and API match. Exit code 1 means drift. Exit code 2 means the check could not be completed. That makes it a one line gate in a CI/CD pipeline.
+## What it does not do
 
-## New in 0.2.0
+* It never sends POST, PUT, PATCH or DELETE, so it cannot create, change or delete data.
+* It does not compare response bodies that are not JSON.
+* It does not test business logic, performance or security, and it is not a mock server or a spec linter.
+* It cannot check a spec on its own: a running API is required.
 
-* More warnings for the values an API returns: string formats (`date-time`,
-  `uuid`, `email`, `uri`), string lengths, numeric ranges and patterns, and
-  required response headers that are missing.
-* `--format json` now adds per severity `counts` and a flat `findings` list
-  next to the per operation details.
-* The GitHub Action takes a `version` input to install an exact SpecSentinel
-  release instead of the latest one.
+## Install and first run
 
-Note for `--strict` users: the new checks are warnings, so a run that used to
-be green can turn red with `--strict`. Review the new findings before enabling
-strict in an existing pipeline.
-
-## Install
-
-Python 3.9 or newer.
+Python 3.9 or newer. The demo API ships with the repository.
 
 ```
 pip install specsentinel
-```
-
-Or from a clone of this repository:
-
-```
-pip install .
-```
-
-## Try it in one minute
-
-The repository ships a demo API that drifts from its spec on purpose.
-
-```
+git clone https://github.com/b6bs62fhys-jpg/specsentinel && cd specsentinel
 python examples/demo_server.py &
 specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
 ```
 
-Real output:
+The demo drifts on purpose. Real output:
 
 ```
 SpecSentinel 0.2.0
@@ -79,6 +58,20 @@ Result: DRIFT (exit code 1)
 ```
 
 Start the demo with `--conform` and the same command ends with `Result: MATCH (exit code 0)`.
+
+## New in 0.2.0
+
+* More warnings for the values an API returns: string formats (`date-time`,
+  `uuid`, `email`, `uri`), string lengths, numeric ranges and patterns, and
+  required response headers that are missing.
+* `--format json` now adds per severity `counts` and a flat `findings` list
+  next to the per operation details.
+* The GitHub Action takes a `version` input to install an exact SpecSentinel
+  release instead of the latest one.
+
+Note for `--strict` users: the new checks are warnings, so a run that used to
+be green can turn red with `--strict`. Review the new findings before enabling
+strict in an existing pipeline.
 
 ## Exit codes
 
@@ -122,6 +115,8 @@ specsentinel SPEC --url BASE_URL [options]
   -H, --header 'N: v'    header sent with every request, repeatable
   --param NAME=VALUE     value for a path or query parameter, repeatable
   --params-file FILE     YAML or JSON file with parameter values
+  --baseline FILE        ignore findings recorded in FILE
+  --write-baseline FILE  write all current findings to FILE
   --timeout SECONDS      wait per request, default 10
   --strict               treat warnings as drift
   --format text|json     output format, default text
@@ -147,18 +142,21 @@ included in the output.
     "drift": 1,
     "skipped": 1,
     "failed": 0,
-    "counts": {"error": 1, "warning": 1}
+    "counts": {"error": 1, "warning": 1},
+    "baselined": 0
   },
   "findings": [
     {"code": "MISSING_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "error"},
     {"code": "UNDOCUMENTED_FIELD", "method": "GET", "path": "/pets/{petId}", "severity": "warning"}
   ],
+  "fixed": [],
   "operations": [
     {
       "method": "GET",
       "path": "/pets/{petId}",
       "status": 200,
       "state": "DRIFT",
+      "baselined": 0,
       "findings": [
         {"severity": "error", "code": "MISSING_FIELD", "location": "body.name", "message": "required field is missing in the response"},
         {"severity": "warning", "code": "UNDOCUMENTED_FIELD", "location": "body.extra", "message": "field is not documented in the spec"}
@@ -167,6 +165,27 @@ included in the output.
   ]
 }
 ```
+
+## Adopt it in an existing project
+
+An API that already drifts makes the first run red. Record what is there today as
+a baseline, then only new drift fails:
+
+```
+specsentinel openapi.yaml --url https://staging.example.com --write-baseline baseline.json
+specsentinel openapi.yaml --url https://staging.example.com --baseline baseline.json
+```
+
+The first command writes every current finding to `baseline.json` and exits 1,
+because nothing is accepted yet. The second run ignores those findings: they are
+counted as `baselined` and no longer affect the exit code. New findings behave as
+before, so an error still fails and a warning still needs `--strict`.
+
+A finding is matched by method, path, code and location, not by its message, so
+editing a message does not invalidate the baseline. Baseline findings that no
+longer occur are listed as `fixed`, which tells you what can be removed. Re-run
+`--write-baseline` to refresh the file after fixing drift. In `--format json` the
+number is `summary.baselined` and the fixed findings are in the `fixed` list.
 
 ## How requests are built
 

@@ -62,7 +62,8 @@ def test_warnings_only_pass_normally_and_fail_with_strict(capsys, tmp_path, star
 def test_unreachable_api_gives_exit_code_2(capsys, spec_path):
     code, out = run(capsys, spec_path, "--url", "http://127.0.0.1:1", "--timeout", "2")
     assert code == 2
-    assert "INCOMPLETE" in out.out
+    assert out.out == ""
+    assert "could not check any operation" in out.err
 
 
 def test_missing_spec_gives_exit_code_2(capsys):

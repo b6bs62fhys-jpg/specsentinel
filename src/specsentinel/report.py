@@ -31,11 +31,20 @@ def render_text(report: Report, spec_source: str, base_url: str) -> str:
             lines.append(f"    {f.severity.ljust(7)} {f.code.ljust(24)} {f.location}")
             lines.append(f"            {f.message}")
 
+    if report.fixed:
+        lines.append("")
+        lines.append("Baseline findings that no longer occur (fixed):")
+        for entry in report.fixed:
+            lines.append(f"    {entry['code'].ljust(24)} {entry['method']} {entry['path']}  {entry['location']}")
+
     lines.append("")
-    lines.append(
+    summary = (
         f"{len(report.checked)} checked, {len(report.drifted)} with drift, "
         f"{len(report.skipped)} skipped, {len(report.failed)} failed"
     )
+    if report.baseline_loaded:
+        summary += f", {report.baselined_count} baselined"
+    lines.append(summary)
     code = report.exit_code()
     verdict = {0: "MATCH", 1: "DRIFT", 2: "INCOMPLETE"}[code]
     lines.append(f"Result: {verdict} (exit code {code})")
@@ -63,11 +72,17 @@ def render_json(report: Report, spec_source: str, base_url: str) -> str:
             "skipped": len(report.skipped),
             "failed": len(report.failed),
             "counts": _severity_counts(report),
+            "baselined": report.baselined_count,
         },
         "findings": [
             {"code": f.code, "method": r.method, "path": r.path, "severity": f.severity}
             for r in report.results
             for f in r.findings
+        ],
+        "fixed": [
+            {"code": e["code"], "method": e["method"], "path": e["path"],
+             "location": e["location"], "severity": e["severity"]}
+            for e in report.fixed
         ],
         "operations": [
             {
@@ -77,6 +92,7 @@ def render_json(report: Report, spec_source: str, base_url: str) -> str:
                 "state": _state(r, report.strict),
                 "skipped": r.skipped,
                 "error": r.error,
+                "baselined": len(r.baselined),
                 "findings": [
                     {"severity": f.severity, "code": f.code,
                      "location": f.location, "message": f.message}

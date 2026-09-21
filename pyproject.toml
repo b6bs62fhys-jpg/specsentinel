@@ -9,10 +9,14 @@ description = "Detects when a live API drifts from its OpenAPI spec. Exit code 0
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-keywords = ["openapi", "api", "contract", "drift", "testing", "cli"]
+keywords = ["openapi", "api", "contract testing", "drift", "ci", "cli"]
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Environment :: Console",
     "Topic :: Software Development :: Testing",
 ]
@@ -21,6 +25,7 @@ dependencies = ["PyYAML>=6"]
 [project.urls]
 Homepage = "https://github.com/b6bs62fhys-jpg/specsentinel"
 Issues = "https://github.com/b6bs62fhys-jpg/specsentinel/issues"
+Changelog = "https://github.com/b6bs62fhys-jpg/specsentinel/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
