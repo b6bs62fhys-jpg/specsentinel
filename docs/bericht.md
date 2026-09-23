@@ -66,6 +66,65 @@ Alle Läufe grün vor jedem Commit.
 - **TEIL 2b (46414ab):** Downloads über 50 MB schlagen fehl statt Speicher zu
   belegen. Belegt durch `test_download_over_size_limit_is_rejected`.
 
+## Folgeauftrag (TEIL A–C), 2026-09-23
+
+Fortsetzung auf demselben Branch `pflege-2026-09-23`. Weiterhin kein Push,
+kein Merge, kein Release, kein `git add .`/`-A`, explizites Staging.
+
+### TEIL A: Typscheck (mypy)
+
+- `599c5aa` `chore(typing): mypy strikt als Dev-Dependency (dev extras + tool.mypy) (TEIL Aa)`:
+  `mypy>=1` und `types-PyYAML` als Dev-Extras, `[tool.mypy]` mit
+  `python_version = "3.9"` und `strict = true`, `files = ["src/specsentinel"]`.
+  Die vom Auftraggeber freigegebene Antwort auf die Fahrplan-Frage #7
+  („Darf mypy als Dev-Dependencies ergänzt werden?") war **ja**.
+- `f0d25a0` `chore(typing): mypy-Fehler beheben und typecheck in CI (TEIL Ab/Ac)`:
+  mypy-Fehler in `baseline.py`, `checker.py`, `cli.py`, `report.py`, `runner.py`,
+  `spec.py`, `swagger2.py` behoben (v. a. Explicite `dict[str, Any]`-Parameter
+  und Klassenvariablen-Annotationen). `ci.yml` prüft seither zusätzlich
+  `mypy src/specsentinel` je Python-Version. Ergebnis: **Success: no issues
+  found in 9 source files**.
+
+### TEIL B: Fahrplan 1–5
+
+| Nr. | Commit | Inhalt |
+|---|---|---|
+| 1 | `bea4573` | `openapi`-Version prüfen (nur `3.x` akzeptiert) und im JSON-Output als `openapi_version` anzeigen (Swagger-Quellen: `swagger 2.0`). Neue `tests/test_openapi_version.py`, Ergänzung in `test_swagger2.py` |
+| 2 | `064c4d6` | `const` (→ `CONST_MISMATCH`) und `exclusiveMinimum`/`exclusiveMaximum` prüfen: 3.1-Zahlen direkt, 3.0 als Bool-Modifier auf `minimum`/`maximum` (→ `RANGE_MISMATCH`). 8 neue Tests in `test_format_warnings.py` |
+| 3 | – | **Übersprungen** (siehe unten) |
+| 4 | `298bb3f` | Format-Checks `date` (RFC 3339 full-date) und `byte` (Base64) → `FORMAT_MISMATCH`; `test_unknown_format_is_ignored` auf das weiterhin unbekannte Format `password` umgestellt |
+| 5 | `6c79249` | CLI-Optionen `--spec-max-bytes` (Default 50 MiB) und `--spec-timeout` (Default 20 s) für Download von Spec und Referenzen; 3 neue Tests in `test_external_refs.py` |
+
+**Fahrplan 3 (Endpunkt-Scan) — bewusst übersprungen.** Die Erkennung von
+Endpunkten, die die live API zusätzlich zu der Spec liefert, widerspricht dem
+Spec-getriebenen Modell von SpecSentinel (es ruft nur GET-Operationen aus der
+Spec auf) und würde den Output/Exit-Code-Semantik erweitern — laut Fahrplan 3
+und `bestand.md` d ist das ein neues Feature, dessen Erkennung einen
+Verhaltensbruch bedeutet (STOPPGRUND, siehe „Nicht getan"). Die Grenze ist
+bereits durch `test_e2e.py` als erwartetes Verhalten dokumentiert. Ein
+Anschluss-Auftrag kann den Scan als opt-in (`--scan-extra-paths`) auf der Basis
+von Fahrplan 3 aufnehmen.
+
+- `99e8e28` `docs: CHANGELOG-Einträge für Fahrplan 1, 2, 4 und 5 (0.3.0 unveröffentlicht)`:
+  Neue Sektion `## 0.3.0 (unveröffentlicht)` in `CHANGELOG.md` mit den
+  anwendersichtbaren Änderungen aus Fahrplan 1, 2, 4, 5.
+
+### TEIL C: Paketbau
+
+- Wheel und sdist gebaut (`python -m build`): `specsentinel-0.3.0-py3-none-any.whl`
+  und `specsentinel-0.3.0.tar.gz`.
+- Beide in einer frischen venv (Python 3.9.6) installiert; `specsentinel --version`
+  liefert `0.3.0`. Ein Lauf gegen `examples/demo_server.py` mit
+  `examples/petstore.yaml` erkennt den gewollten Drift (exit 1) und meldet
+  `"openapi_version": "3.0.3"` — das Paket ist selbst konsistent mit dem Stand.
+- Kein Upload an Test-PyPI/PyPI, kein Tag, kein verschieben nach `dist/`.
+  Soll veröffentlicht werden, ist das ein eigener Auftrag (vgl. Fahrplan #10).
+
+### Testergebnis (Endstand)
+
+**158 passed**, mypy: **Success: no issues found in 9 source files**. Grüne
+Läufe vor jedem Commit.
+
 ## „Unklar" / offene Punkte
 
 - **OpenAPI-Version:** `spec.py` prüft nur das Vorhandensein von `openapi`,
@@ -95,7 +154,9 @@ Alle Läufe grün vor jedem Commit.
 - Kein `git add .`/`-A`, nur explizites Staging.
 - Die ungemergten `ausbau4`-Arbeiten (JUnit-Output, Step-Summary, Action-Output)
   blieben unberührt.
-- Keine neuen Laufzeit- oder Dev-Abhängigkeiten.
+- Keine neuen Laufzeit-Abhängigkeiten. `mypy` und `types-PyYAML` kamen im
+  Folgeauftrag TEIL A als Dev-Dependencies hinzu (vom Auftraggeber freigegeben,
+  Fahrplan #7).
 - Öffentliche Schnittstellen (CLI, Python-API, Ausgabeformat) unverändert;
   alle Änderungen erweitern nur Meldungstexte und betten neue optionale
   Parameter ein.
