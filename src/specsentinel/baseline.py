@@ -19,7 +19,7 @@ class BaselineError(Exception):
     """The baseline file is missing, unreadable or malformed."""
 
 
-def entry_key(entry: dict) -> tuple:
+def entry_key(entry: dict) -> tuple[str, str, str, str]:
     return (entry["method"], entry["path"], entry["code"], entry["location"])
 
 

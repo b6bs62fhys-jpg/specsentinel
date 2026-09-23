@@ -7,6 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from typing import Any
 
 from . import __version__
 from .checker import ERROR, WARNING, Finding, check_response
@@ -88,7 +89,7 @@ class Report:
 # request building
 # --------------------------------------------------------------------------
 
-def _example_value(spec: dict, param: dict):
+def _example_value(spec: dict, param: dict) -> Any:
     if "example" in param:
         return param["example"]
     examples = param.get("examples")
@@ -106,7 +107,7 @@ def _example_value(spec: dict, param: dict):
     return _MISSING
 
 
-def _as_text(value) -> str:
+def _as_text(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)

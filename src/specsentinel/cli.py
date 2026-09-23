@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -17,16 +18,16 @@ from .baseline import (
     write_baseline,
 )
 from .report import render_json, render_text
-from .runner import run_check
+from .runner import Report, run_check
 from .spec import SpecError, load_spec
 
 
-def _one_line(text) -> str:
+def _one_line(text: Any) -> str:
     """Collapse any exception text to a single line, so errors stay readable."""
     return " ".join(str(text).split())
 
 
-def _fatal(message, fmt: str) -> int:
+def _fatal(message: Any, fmt: str) -> int:
     """Print a fatal error and return exit code 2.
 
     The human readable message always goes to stderr. In JSON mode a small
@@ -39,7 +40,7 @@ def _fatal(message, fmt: str) -> int:
     return 2
 
 
-def _nothing_checked_message(report, base_url: str) -> str:
+def _nothing_checked_message(report: Report, base_url: str) -> str:
     if report.failed:
         reason = report.failed[0].error or "unknown error"
         if reason.startswith("spec problem"):
@@ -51,7 +52,7 @@ def _nothing_checked_message(report, base_url: str) -> str:
     return "the spec has no GET operations to check."
 
 
-def _should_collapse(report) -> bool:
+def _should_collapse(report: Report) -> bool:
     """True when nothing was checked and a one line error is clearer than a report.
 
     When every failure is a spec problem (a bad reference, for example) the

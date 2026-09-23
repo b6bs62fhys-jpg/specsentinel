@@ -9,6 +9,8 @@ instead of raising, so a single odd operation never stops the run.
 from __future__ import annotations
 
 import copy
+from typing import Any
+
 
 _SCHEMA_KEYS = (
     "type", "format", "items", "enum", "default", "minimum", "maximum",
@@ -62,7 +64,7 @@ def translate(data: dict) -> tuple[dict, dict]:
     return doc, skip_reasons
 
 
-def translate_operation(operation: dict, global_produces) -> tuple[dict, str | None]:
+def translate_operation(operation: dict, global_produces: Any) -> tuple[dict, str | None]:
     media_types = _media_types(operation.get("produces", global_produces))
     parameters, reason = translate_parameters(operation.get("parameters") or [])
     if reason is not None:
@@ -85,7 +87,7 @@ def translate_operation(operation: dict, global_produces) -> tuple[dict, str | N
     return new_operation, None
 
 
-def translate_parameters(raw_parameters) -> tuple[list[dict], str | None]:
+def translate_parameters(raw_parameters: Any) -> tuple[list[dict], str | None]:
     translated = []
     for raw in raw_parameters:
         if not isinstance(raw, dict):
@@ -112,7 +114,7 @@ def translate_parameters(raw_parameters) -> tuple[list[dict], str | None]:
     return translated, None
 
 
-def translate_response(response, media_types: list[str]) -> tuple[dict, str | None]:
+def translate_response(response: Any, media_types: list[str]) -> tuple[dict, str | None]:
     if not isinstance(response, dict):
         return {}, "Swagger 2.0 response is not an object"
     if "$ref" in response:
@@ -149,7 +151,7 @@ def translate_response(response, media_types: list[str]) -> tuple[dict, str | No
     return new_response, None
 
 
-def rewrite_refs(value):
+def rewrite_refs(value: Any) -> Any:
     """Deep copy ``value``, rewrite ``$ref`` targets and map x-nullable to
     nullable, so every schema, nested in properties and items, is handled."""
     if isinstance(value, dict):
@@ -180,7 +182,7 @@ def _schema_of(source: dict) -> dict:
     return {key: copy.deepcopy(source[key]) for key in _SCHEMA_KEYS if key in source}
 
 
-def _media_types(produces) -> list[str]:
+def _media_types(produces: Any) -> list[str]:
     if not produces:
         return ["application/json"]
     if isinstance(produces, str):
@@ -192,7 +194,7 @@ def _media_types(produces) -> list[str]:
     return seen or ["application/json"]
 
 
-def _contains_file(value) -> bool:
+def _contains_file(value: Any) -> bool:
     if isinstance(value, dict):
         if value.get("type") == "file":
             return True

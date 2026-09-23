@@ -13,6 +13,7 @@ import json
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import Any, Type
 
 import yaml
 
@@ -46,7 +47,7 @@ class _Tagged(dict):
 class _Resolver:
     """Loads referenced documents on demand and caches them by canonical name."""
 
-    def __init__(self, root: SpecDocument):
+    def __init__(self, root: SpecDocument) -> None:
         self._cache = {_canonical(root._source): root}
 
     def document(self, source: str) -> SpecDocument:
@@ -59,7 +60,7 @@ class _Resolver:
         self._cache[key] = doc
         return doc
 
-    def resolve(self, ref: str, base: SpecDocument):
+    def resolve(self, ref: str, base: SpecDocument) -> "_Tagged | Any":
         file_part, _, fragment = ref.partition("#")
         if file_part:
             target = self.document(_join(base._source, file_part))
@@ -84,7 +85,7 @@ def _join(base: str, ref_file: str) -> str:
     return str((Path(base).parent / ref_file).resolve())
 
 
-def _tagged(value, doc):
+def _tagged(value: Any, doc: Any) -> Any:
     if isinstance(value, dict):
         wrapped = _Tagged(value)
         wrapped._doc = doc
@@ -92,11 +93,11 @@ def _tagged(value, doc):
     return value
 
 
-def _doc_of(node):
+def _doc_of(node: Any) -> Any:
     return getattr(node, "_doc", None)
 
 
-def _download(source: str, exc_type) -> str:
+def _download(source: str, exc_type: Type[Exception]) -> str:
     try:
         with urllib.request.urlopen(source, timeout=20) as response:
             return _read_limited(response, source, exc_type).decode("utf-8")
@@ -106,7 +107,7 @@ def _download(source: str, exc_type) -> str:
         raise exc_type(f"Could not load {source}: {exc}") from exc
 
 
-def _read_limited(response, source: str, exc_type) -> bytes:
+def _read_limited(response: Any, source: str, exc_type: Type[Exception]) -> bytes:
     """Read the response body but stop at MAX_DOWNLOAD_BYTES, so a spec
     served terabytes cannot exhaust the memory of the machine running the
     check."""
@@ -121,7 +122,7 @@ def _read_limited(response, source: str, exc_type) -> bytes:
     return b"".join(chunks)
 
 
-def _parse(text: str, label: str, exc_type) -> dict:
+def _parse(text: str, label: str, exc_type: Type[Exception]) -> dict:
     try:
         data = json.loads(text)
     except ValueError:
@@ -182,7 +183,7 @@ def load_spec(source: str) -> SpecDocument:
     return doc
 
 
-def _navigate(doc: dict, fragment: str, ref: str):
+def _navigate(doc: dict, fragment: str, ref: str) -> Any:
     node = doc
     for part in fragment.lstrip("/").split("/"):
         part = part.replace("~1", "/").replace("~0", "~")
@@ -192,14 +193,14 @@ def _navigate(doc: dict, fragment: str, ref: str):
     return node
 
 
-def resolve_ref(spec: dict, ref: str):
+def resolve_ref(spec: dict, ref: str) -> Any:
     """Resolve a local ``#/...`` reference inside the given document."""
     if not ref.startswith("#/"):
         raise SpecError(f"Only local references are supported, got: {ref}")
     return _navigate(spec, ref[1:], ref)
 
 
-def deref(spec: dict, node):
+def deref(spec: dict, node: Any) -> Any:
     """Follow $ref chains until a real object is reached.
 
     Cross document references are resolved relative to the document that holds
@@ -227,7 +228,7 @@ def deref(spec: dict, node):
     return node
 
 
-def iter_get_operations(spec: dict):
+def iter_get_operations(spec: dict) -> Any:
     """Yield (path, path_item, operation) for every GET operation.
 
     SpecSentinel only sends GET requests. Mutating methods could change data

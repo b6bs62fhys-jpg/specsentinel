@@ -5,6 +5,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 from .spec import deref
@@ -27,7 +28,7 @@ class Finding:
 # type helpers
 # --------------------------------------------------------------------------
 
-def type_of(value) -> str:
+def type_of(value: Any) -> str:
     if value is None:
         return "null"
     if isinstance(value, bool):  # bool is a subclass of int, check it first
@@ -45,7 +46,7 @@ def type_of(value) -> str:
     return type(value).__name__
 
 
-def type_matches(expected: str, value) -> bool:
+def type_matches(expected: str, value: Any) -> bool:
     actual = type_of(value)
     if expected == actual:
         return True
@@ -56,7 +57,7 @@ def type_matches(expected: str, value) -> bool:
     return False
 
 
-def enum_contains(options: list, value) -> bool:
+def enum_contains(options: list, value: Any) -> bool:
     return any(type_of(o) == type_of(value) and o == value for o in options)
 
 
@@ -112,11 +113,11 @@ _FORMAT_CHECKS = {
 }
 
 
-def _is_number(value) -> bool:
+def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _validate_constraints(schema: dict, value, path: str) -> list[Finding]:
+def _validate_constraints(schema: dict, value: Any, path: str) -> list[Finding]:
     """Check formats, lengths, ranges and patterns. Returns warnings only."""
     out: list[Finding] = []
 
@@ -156,7 +157,7 @@ def _validate_constraints(schema: dict, value, path: str) -> list[Finding]:
 # schema handling
 # --------------------------------------------------------------------------
 
-def flatten_all_of(spec: dict, schema, depth: int = 0) -> dict:
+def flatten_all_of(spec: dict, schema: Any, depth: int = 0) -> dict:
     """Merge allOf members into one schema so extra field detection is correct."""
     schema = deref(spec, schema)
     if not isinstance(schema, dict):
@@ -191,7 +192,7 @@ def _describe_types(types: list[str]) -> str:
     return " or ".join(types)
 
 
-def validate_value(spec: dict, schema, value, path: str, depth: int = 0) -> list[Finding]:
+def validate_value(spec: dict, schema: Any, value: Any, path: str, depth: int = 0) -> list[Finding]:
     """Validate a JSON value against a schema. Returns findings, never raises."""
     if depth > 40:
         return []
@@ -295,7 +296,7 @@ def _validate_object(spec: dict, schema: dict, value: dict, path: str, depth: in
 # response level checks
 # --------------------------------------------------------------------------
 
-def match_response(responses: dict, status: int):
+def match_response(responses: dict, status: int) -> Any:
     """Find the documented response for a status: exact, then 2XX style, then default."""
     keys = {str(k).upper(): v for k, v in (responses or {}).items()}
     for candidate in (str(status), f"{status // 100}XX", "DEFAULT"):
@@ -304,7 +305,7 @@ def match_response(responses: dict, status: int):
     return None
 
 
-def pick_media_type(content: dict, content_type: str):
+def pick_media_type(content: dict, content_type: str) -> Any:
     main = content_type.split(";")[0].strip().lower()
     for key in content:
         if key.lower() == main:
