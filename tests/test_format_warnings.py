@@ -82,8 +82,25 @@ def test_uri_format():
     assert codes(result) == ["FORMAT_MISMATCH"]
 
 
+def test_date_format():
+    schema = {"type": "string", "format": "date"}
+    assert validate_value(SPEC, schema, "2020-01-31", "b") == []
+    result = validate_value(SPEC, schema, "2020-13-01", "b")
+    assert codes(result) == ["FORMAT_MISMATCH"]
+    result = validate_value(SPEC, schema, "2020-01-01T00:00:00Z", "b")
+    assert codes(result) == ["FORMAT_MISMATCH"]
+
+
+def test_byte_format():
+    schema = {"type": "string", "format": "byte"}
+    assert validate_value(SPEC, schema, "aGVsbG8=", "b") == []
+    assert validate_value(SPEC, schema, "", "b") == []
+    result = validate_value(SPEC, schema, "not base64!!", "b")
+    assert codes(result) == ["FORMAT_MISMATCH"]
+
+
 def test_unknown_format_is_ignored():
-    assert validate_value(SPEC, {"type": "string", "format": "byte"}, "anything", "b") == []
+    assert validate_value(SPEC, {"type": "string", "format": "password"}, "anything", "b") == []
 
 
 def test_min_length_and_max_length():

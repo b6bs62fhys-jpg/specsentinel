@@ -1,6 +1,7 @@
 """Compare one live HTTP response with the OpenAPI operation that describes it."""
 from __future__ import annotations
 
+import base64
 import json
 import re
 import uuid
@@ -92,6 +93,31 @@ def _is_datetime(value: str) -> bool:
     )
 
 
+_DATE_RE = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})$")
+
+
+def _is_date(value: str) -> bool:
+    """RFC 3339 full-date. The month/day bounds are the same as _is_datetime's."""
+    match = _DATE_RE.match(value)
+    if match is None:
+        return False
+    return (
+        1 <= int(match["month"]) <= 12
+        and 1 <= int(match["day"]) <= 31
+    )
+
+
+def _is_base64(value: str) -> bool:
+    """RFC 4648 base64. Whitespace is not allowed, padding is optional."""
+    if not value:
+        return True
+    try:
+        base64.b64decode(value.encode("ascii"), validate=True)
+        return True
+    except (ValueError, UnicodeEncodeError):
+        return False
+
+
 def _is_uuid(value: str) -> bool:
     try:
         uuid.UUID(value)
@@ -107,9 +133,11 @@ def _is_uri(value: str) -> bool:
 
 _FORMAT_CHECKS = {
     "date-time": _is_datetime,
+    "date": _is_date,
     "uuid": _is_uuid,
     "email": lambda v: _EMAIL_RE.fullmatch(v) is not None,
     "uri": _is_uri,
+    "byte": _is_base64,
 }
 
 
