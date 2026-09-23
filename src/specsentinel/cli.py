@@ -66,8 +66,8 @@ def _should_collapse(report: Report) -> bool:
     return True
 
 
-def _parse_headers(values: list[str]) -> dict:
-    headers = {}
+def _parse_headers(values: list[str]) -> dict[str, str]:
+    headers: dict[str, str] = {}
     for raw in values:
         if ":" not in raw:
             raise ValueError(f"Invalid header '{raw}'. Use the form 'Name: value'.")
@@ -76,8 +76,8 @@ def _parse_headers(values: list[str]) -> dict:
     return headers
 
 
-def _parse_params(values: list[str]) -> dict:
-    params = {}
+def _parse_params(values: list[str]) -> dict[str, str]:
+    params: dict[str, str] = {}
     for raw in values:
         if "=" not in raw:
             raise ValueError(f"Invalid parameter '{raw}'. Use the form NAME=VALUE.")
@@ -86,7 +86,7 @@ def _parse_params(values: list[str]) -> dict:
     return params
 
 
-def _load_params_file(path: str) -> tuple[dict, dict]:
+def _load_params_file(path: str) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """Read a params file. Returns (defaults, per_operation).
 
     Plain entries apply to every operation that has a parameter of that name.
@@ -108,8 +108,8 @@ def _load_params_file(path: str) -> tuple[dict, dict]:
     if not isinstance(data, dict):
         raise ValueError("Params file must be a mapping of parameter names to values.")
 
-    defaults: dict = {}
-    per_operation: dict = {}
+    defaults: dict[str, Any] = {}
+    per_operation: dict[str, dict[str, Any]] = {}
     for key, value in data.items():
         if isinstance(value, dict) and str(key).strip().upper().startswith("GET "):
             label = "GET " + str(key).strip()[4:].strip()
@@ -160,7 +160,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         headers = _parse_headers(args.header)
         overrides = _parse_params(args.param)
-        defaults, per_operation = ({}, {})
+        defaults: dict[str, Any] = {}
+        per_operation: dict[str, dict[str, Any]] = {}
         if args.params_file:
             defaults, per_operation = _load_params_file(args.params_file)
         baseline_entries = load_baseline(args.baseline) if args.baseline else []

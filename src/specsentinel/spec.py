@@ -32,16 +32,22 @@ class RefLoadError(SpecError):
     """A referenced document is missing, unreadable, or cannot be resolved."""
 
 
-class SpecDocument(dict):
+class SpecDocument(dict[str, Any]):
     """A loaded document that remembers its source and reference resolver."""
 
+    _source: str = ""
+    _resolver: "_Resolver | None" = None
+    _skip_reasons: "dict[str, str]" = {}
 
-class _Tagged(dict):
+
+class _Tagged(dict[str, Any]):
     """A resolved reference target that knows which document it lives in.
 
     Without this tag a ``$ref`` inside a referenced file would wrongly be
     resolved against the root document instead of against its own file.
     """
+
+    _doc: Any = None
 
 
 class _Resolver:
@@ -122,7 +128,7 @@ def _read_limited(response: Any, source: str, exc_type: Type[Exception]) -> byte
     return b"".join(chunks)
 
 
-def _parse(text: str, label: str, exc_type: Type[Exception]) -> dict:
+def _parse(text: str, label: str, exc_type: Type[Exception]) -> dict[str, Any]:
     try:
         data = json.loads(text)
     except ValueError:
@@ -183,7 +189,7 @@ def load_spec(source: str) -> SpecDocument:
     return doc
 
 
-def _navigate(doc: dict, fragment: str, ref: str) -> Any:
+def _navigate(doc: dict[str, Any], fragment: str, ref: str) -> Any:
     node = doc
     for part in fragment.lstrip("/").split("/"):
         part = part.replace("~1", "/").replace("~0", "~")
@@ -193,14 +199,14 @@ def _navigate(doc: dict, fragment: str, ref: str) -> Any:
     return node
 
 
-def resolve_ref(spec: dict, ref: str) -> Any:
+def resolve_ref(spec: dict[str, Any], ref: str) -> Any:
     """Resolve a local ``#/...`` reference inside the given document."""
     if not ref.startswith("#/"):
         raise SpecError(f"Only local references are supported, got: {ref}")
     return _navigate(spec, ref[1:], ref)
 
 
-def deref(spec: dict, node: Any) -> Any:
+def deref(spec: dict[str, Any], node: Any) -> Any:
     """Follow $ref chains until a real object is reached.
 
     Cross document references are resolved relative to the document that holds
@@ -228,7 +234,7 @@ def deref(spec: dict, node: Any) -> Any:
     return node
 
 
-def iter_get_operations(spec: dict) -> Any:
+def iter_get_operations(spec: dict[str, Any]) -> Any:
     """Yield (path, path_item, operation) for every GET operation.
 
     SpecSentinel only sends GET requests. Mutating methods could change data

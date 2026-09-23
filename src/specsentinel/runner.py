@@ -55,7 +55,7 @@ class Report:
     results: list[OperationResult]
     strict: bool = False
     baseline_loaded: bool = False
-    fixed: list[dict] = field(default_factory=list)
+    fixed: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def baselined_count(self) -> int:
@@ -89,7 +89,7 @@ class Report:
 # request building
 # --------------------------------------------------------------------------
 
-def _example_value(spec: dict, param: dict) -> Any:
+def _example_value(spec: dict[str, Any], param: dict[str, Any]) -> Any:
     if "example" in param:
         return param["example"]
     examples = param.get("examples")
@@ -113,20 +113,22 @@ def _as_text(value: Any) -> str:
     return str(value)
 
 
-def _collect_parameters(spec: dict, path_item: dict, operation: dict) -> list[dict]:
-    merged: dict[tuple, dict] = {}
+def _collect_parameters(spec: dict[str, Any], path_item: dict[str, Any],
+                        operation: dict[str, Any]) -> list[dict[str, Any]]:
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
     for raw in (path_item.get("parameters") or []) + (operation.get("parameters") or []):
         param = deref(spec, raw)
         if isinstance(param, dict) and "name" in param and "in" in param:
-            merged[(param["in"], param["name"])] = param  # operation level wins
+            merged[(str(param["in"]), str(param["name"]))] = param  # operation level wins
     return list(merged.values())
 
 
-def build_request(spec: dict, base_url: str, path: str, path_item: dict,
-                  operation: dict, overrides: dict[str, str]) -> tuple[str, dict]:
+def build_request(spec: dict[str, Any], base_url: str, path: str,
+                  path_item: dict[str, Any], operation: dict[str, Any],
+                  overrides: dict[str, str]) -> tuple[str, dict[str, str]]:
     target_path = path
-    query: dict = {}
-    headers: dict = {}
+    query: dict[str, Any] = {}
+    headers: dict[str, str] = {}
 
     for param in _collect_parameters(spec, path_item, operation):
         location, name = param["in"], param["name"]
@@ -159,7 +161,7 @@ def build_request(spec: dict, base_url: str, path: str, path_item: dict,
 # sending
 # --------------------------------------------------------------------------
 
-def fetch(url: str, headers: dict, timeout: float) -> tuple[int, dict, bytes]:
+def fetch(url: str, headers: dict[str, str], timeout: float) -> tuple[int, dict[str, str], bytes]:
     request = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -168,10 +170,11 @@ def fetch(url: str, headers: dict, timeout: float) -> tuple[int, dict, bytes]:
         return exc.code, dict(exc.headers), exc.read()
 
 
-def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
+def run_check(spec: dict[str, Any], base_url: str, *,
+              extra_headers: dict[str, str] | None = None,
               overrides: dict[str, str] | None = None,
-              defaults: dict | None = None,
-              per_operation: dict[str, dict] | None = None,
+              defaults: dict[str, Any] | None = None,
+              per_operation: dict[str, dict[str, Any]] | None = None,
               include: list[str] | None = None,
               exclude: list[str] | None = None,
               timeout: float = 10.0, strict: bool = False,

@@ -57,7 +57,7 @@ def type_matches(expected: str, value: Any) -> bool:
     return False
 
 
-def enum_contains(options: list, value: Any) -> bool:
+def enum_contains(options: list[Any], value: Any) -> bool:
     return any(type_of(o) == type_of(value) and o == value for o in options)
 
 
@@ -117,7 +117,7 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _validate_constraints(schema: dict, value: Any, path: str) -> list[Finding]:
+def _validate_constraints(schema: dict[str, Any], value: Any, path: str) -> list[Finding]:
     """Check formats, lengths, ranges and patterns. Returns warnings only."""
     out: list[Finding] = []
 
@@ -157,7 +157,7 @@ def _validate_constraints(schema: dict, value: Any, path: str) -> list[Finding]:
 # schema handling
 # --------------------------------------------------------------------------
 
-def flatten_all_of(spec: dict, schema: Any, depth: int = 0) -> dict:
+def flatten_all_of(spec: dict[str, Any], schema: Any, depth: int = 0) -> dict[str, Any]:
     """Merge allOf members into one schema so extra field detection is correct."""
     schema = deref(spec, schema)
     if not isinstance(schema, dict):
@@ -192,7 +192,7 @@ def _describe_types(types: list[str]) -> str:
     return " or ".join(types)
 
 
-def validate_value(spec: dict, schema: Any, value: Any, path: str, depth: int = 0) -> list[Finding]:
+def validate_value(spec: dict[str, Any], schema: Any, value: Any, path: str, depth: int = 0) -> list[Finding]:
     """Validate a JSON value against a schema. Returns findings, never raises."""
     if depth > 40:
         return []
@@ -265,7 +265,8 @@ def validate_value(spec: dict, schema: Any, value: Any, path: str, depth: int = 
     return out
 
 
-def _validate_object(spec: dict, schema: dict, value: dict, path: str, depth: int) -> list[Finding]:
+def _validate_object(spec: dict[str, Any], schema: dict[str, Any],
+                     value: dict[str, Any], path: str, depth: int) -> list[Finding]:
     out: list[Finding] = []
     properties = schema.get("properties") or {}
     required = schema.get("required") or []
@@ -296,7 +297,7 @@ def _validate_object(spec: dict, schema: dict, value: dict, path: str, depth: in
 # response level checks
 # --------------------------------------------------------------------------
 
-def match_response(responses: dict, status: int) -> Any:
+def match_response(responses: dict[str, Any], status: int) -> Any:
     """Find the documented response for a status: exact, then 2XX style, then default."""
     keys = {str(k).upper(): v for k, v in (responses or {}).items()}
     for candidate in (str(status), f"{status // 100}XX", "DEFAULT"):
@@ -305,7 +306,7 @@ def match_response(responses: dict, status: int) -> Any:
     return None
 
 
-def pick_media_type(content: dict, content_type: str) -> Any:
+def pick_media_type(content: dict[str, Any], content_type: str) -> Any:
     main = content_type.split(";")[0].strip().lower()
     for key in content:
         if key.lower() == main:
@@ -319,7 +320,8 @@ def pick_media_type(content: dict, content_type: str) -> Any:
     return None
 
 
-def _check_required_headers(spec: dict, documented: dict, headers: dict) -> list[Finding]:
+def _check_required_headers(spec: dict[str, Any], documented: dict[str, Any],
+                            headers: dict[str, Any]) -> list[Finding]:
     """Warnings for response headers the spec marks as required but are missing."""
     declared = deref(spec, documented.get("headers") or {})
     if not isinstance(declared, dict):
@@ -336,8 +338,9 @@ def _check_required_headers(spec: dict, documented: dict, headers: dict) -> list
     return out
 
 
-def _check_response(spec: dict, operation: dict, status: int,
-                    headers: dict, body: bytes, spec_path: str | None = None) -> list[Finding]:
+def _check_response(spec: dict[str, Any], operation: dict[str, Any], status: int,
+                    headers: dict[str, Any], body: bytes,
+                    spec_path: str | None = None) -> list[Finding]:
     """Return every difference between the live response and the operation's spec."""
     responses = deref(spec, operation.get("responses") or {})
     documented = match_response(responses, status)
@@ -400,8 +403,9 @@ def _check_response(spec: dict, operation: dict, status: int,
     return list(dict.fromkeys(header_warnings + findings))  # drop duplicates, keep order
 
 
-def check_response(spec: dict, operation: dict, status: int,
-                   headers: dict, body: bytes, spec_path: str | None = None) -> list[Finding]:
+def check_response(spec: dict[str, Any], operation: dict[str, Any], status: int,
+                   headers: dict[str, Any], body: bytes,
+                   spec_path: str | None = None) -> list[Finding]:
     """Return every difference between the live response and the spec.
 
     A 5xx answer covered only by the catch all `default` response is

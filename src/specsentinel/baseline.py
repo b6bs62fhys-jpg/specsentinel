@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from .runner import Report
 
@@ -19,11 +20,11 @@ class BaselineError(Exception):
     """The baseline file is missing, unreadable or malformed."""
 
 
-def entry_key(entry: dict) -> tuple[str, str, str, str]:
+def entry_key(entry: dict[str, str]) -> tuple[str, str, str, str]:
     return (entry["method"], entry["path"], entry["code"], entry["location"])
 
 
-def _clean(entry: dict) -> dict:
+def _clean(entry: dict[str, Any]) -> dict[str, str]:
     return {
         "method": entry["method"],
         "path": entry["path"],
@@ -33,7 +34,7 @@ def _clean(entry: dict) -> dict:
     }
 
 
-def load_baseline(path: str) -> list[dict]:
+def load_baseline(path: str) -> list[dict[str, str]]:
     """Load a baseline file. Raises BaselineError with a clear reason."""
     file = Path(path)
     if not file.is_file():
@@ -63,7 +64,7 @@ def load_baseline(path: str) -> list[dict]:
     return entries
 
 
-def collect_entries(report: Report) -> list[dict]:
+def collect_entries(report: Report) -> list[dict[str, str]]:
     """Every finding of the run, new and already baselined."""
     entries = []
     for result in report.results:
@@ -79,7 +80,7 @@ def collect_entries(report: Report) -> list[dict]:
     return entries
 
 
-def write_baseline(path: str, entries: list[dict]) -> None:
+def write_baseline(path: str, entries: list[dict[str, str]]) -> None:
     payload = {"findings": entries}
     try:
         Path(path).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -87,7 +88,7 @@ def write_baseline(path: str, entries: list[dict]) -> None:
         raise BaselineError(f"Could not write baseline file {path}: {exc}") from exc
 
 
-def apply_baseline(report: Report, entries: list[dict]) -> None:
+def apply_baseline(report: Report, entries: list[dict[str, str]]) -> None:
     """Move findings that are in the baseline out of the drift path.
 
     Known findings end up in ``OperationResult.baselined`` and no longer affect
@@ -113,8 +114,8 @@ def apply_baseline(report: Report, entries: list[dict]) -> None:
         for f in r.baselined
     }
     checked = {(r.method, r.path) for r in report.checked}
-    seen: set[tuple] = set()
-    fixed: list[dict] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    fixed: list[dict[str, str]] = []
     for entry in entries:
         key = entry_key(entry)
         if key in seen:
