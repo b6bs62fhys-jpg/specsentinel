@@ -337,15 +337,23 @@ def _check_required_headers(spec: dict, documented: dict, headers: dict) -> list
 
 
 def _check_response(spec: dict, operation: dict, status: int,
-                    headers: dict, body: bytes) -> list[Finding]:
+                    headers: dict, body: bytes, spec_path: str | None = None) -> list[Finding]:
     """Return every difference between the live response and the operation's spec."""
     responses = deref(spec, operation.get("responses") or {})
     documented = match_response(responses, status)
 
+    def where(*keys: str) -> str:
+        """Human readable pointer into the spec, e.g. paths./pets/{petId}.get.responses.200."""
+        if not spec_path:
+            return ""
+        suffix = ".".join(keys)
+        return f" (in {spec_path}.{suffix})" if suffix else f" (in {spec_path})"
+
     if documented is None:
         listed = ", ".join(sorted(str(k) for k in responses)) or "none"
         return [Finding(ERROR, "UNDOCUMENTED_STATUS", "status",
-                        f"status {status} is not documented (documented: {listed})")]
+                        f"status {status} is not documented (documented: {listed})"
+                        f"{where('responses')}")]
 
     documented = deref(spec, documented)
     header_warnings = _check_required_headers(spec, documented, headers)
@@ -359,16 +367,19 @@ def _check_response(spec: dict, operation: dict, status: int,
     if not content_type:
         if not body:
             return header_warnings + [Finding(ERROR, "EMPTY_BODY", "body",
-                            "the spec documents a response body but the response was empty")]
+                            "the spec documents a response body but the response was empty"
+                            f"{where('responses', str(status))}")]
         return header_warnings + [Finding(ERROR, "CONTENT_TYPE_MISSING", "header.Content-Type",
-                        "response has a body but no Content-Type header")]
+                        "response has a body but no Content-Type header"
+                        f"{where('responses', str(status))}")]
 
     media = pick_media_type(content, content_type)
     if media is None:
         main = content_type.split(";")[0].strip()
         listed = ", ".join(content) or "none"
         return header_warnings + [Finding(ERROR, "UNDOCUMENTED_CONTENT_TYPE", "header.Content-Type",
-                        f"content type {main} is not documented (documented: {listed})")]
+                        f"content type {main} is not documented (documented: {listed})"
+                        f"{where('responses', str(status))}")]
 
     if "json" not in media.lower():
         return header_warnings  # only JSON bodies are compared in this version
@@ -377,7 +388,8 @@ def _check_response(spec: dict, operation: dict, status: int,
         data = json.loads(body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         return header_warnings + [Finding(ERROR, "INVALID_JSON", "body",
-                        "response is declared as JSON but the body is not valid JSON")]
+                        "response is declared as JSON but the body is not valid JSON"
+                        f"{where('responses', str(status), 'content', media)}")]
 
     media_object = deref(spec, content[media]) or {}
     schema = media_object.get("schema") if isinstance(media_object, dict) else None
@@ -389,16 +401,17 @@ def _check_response(spec: dict, operation: dict, status: int,
 
 
 def check_response(spec: dict, operation: dict, status: int,
-                   headers: dict, body: bytes) -> list[Finding]:
+                   headers: dict, body: bytes, spec_path: str | None = None) -> list[Finding]:
     """Return every difference between the live response and the spec.
 
     A 5xx answer covered only by the catch all `default` response is
     reported as a warning: the spec allows it, but it usually means
     the API is broken.
     """
-    found = _check_response(spec, operation, status, headers, body)
+    found = _check_response(spec, operation, status, headers, body, spec_path)
     keys = {str(k).upper() for k in (deref(spec, operation.get("responses")) or {})}
     if 500 <= status < 600 and not keys & {str(status), "5XX"} and "DEFAULT" in keys:
-        msg = f"server error {status} is only covered by the default response"
+        where = f" (in {spec_path}.responses)" if spec_path else ""
+        msg = f"server error {status} is only covered by the default response{where}"
         found = [Finding(WARNING, "SERVER_ERROR", "status", msg)] + found
     return found

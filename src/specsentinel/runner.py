@@ -236,8 +236,10 @@ def run_check(spec: dict, base_url: str, *, extra_headers: dict | None = None,
             continue
 
         result.status = status
+        spec_path = f"paths.{path}.get"
         try:
-            result.findings = check_response(spec, operation, status, response_headers, body)
+            result.findings = check_response(spec, operation, status, response_headers, body,
+                                             spec_path=spec_path)
         except RefLoadError as exc:
             result.error = f"spec problem: {exc}"
             result.status = None
