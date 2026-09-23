@@ -19,7 +19,7 @@ from .baseline import (
 )
 from .report import render_json, render_text
 from .runner import Report, run_check
-from .spec import SpecError, load_spec
+from .spec import DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_BYTES, SpecError, load_spec
 
 
 def _one_line(text: Any) -> str:
@@ -144,6 +144,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="write all current findings to FILE as a JSON baseline")
     parser.add_argument("--timeout", type=float, default=10.0,
                         help="seconds to wait per request (default 10)")
+    parser.add_argument("--spec-timeout", type=float, default=DOWNLOAD_TIMEOUT,
+                        help=f"seconds to wait when downloading the spec and referenced "
+                             f"documents (default {DOWNLOAD_TIMEOUT:g})")
+    parser.add_argument("--spec-max-bytes", type=int, default=MAX_DOWNLOAD_BYTES,
+                        help=f"maximum size in bytes for the spec and referenced "
+                             f"documents (default {MAX_DOWNLOAD_BYTES})")
     parser.add_argument("--delay", type=float, default=0.0,
                         help="seconds to wait between requests (default 0)")
     parser.add_argument("--strict", action="store_true",
@@ -165,7 +171,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.params_file:
             defaults, per_operation = _load_params_file(args.params_file)
         baseline_entries = load_baseline(args.baseline) if args.baseline else []
-        spec = load_spec(args.spec)
+        spec = load_spec(args.spec, max_bytes=args.spec_max_bytes,
+                         timeout=args.spec_timeout)
     except (ValueError, SpecError, BaselineError) as exc:
         return _fatal(exc, args.format)
 

@@ -1,6 +1,7 @@
 """External $ref resolution: files, fragments, relative paths and URLs."""
 import http.server
 import threading
+import time
 
 import pytest
 
@@ -330,6 +331,93 @@ def test_download_over_size_limit_is_rejected(tmp_path):
             raise AssertionError("load_spec should have failed")
         except SpecError as exc:
             assert "download limit" in str(exc)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_download_size_limit_is_configurable(tmp_path):
+    from specsentinel.spec import SpecError, load_spec
+
+    small = ("openapi: 3.0.3\n"
+             "info: {title: api, version: \"1\"}\n"
+             "paths: {}\n")
+    body = (small + ("# pad\n" * 300)).encode("utf-8")  # > 1024 bytes, valid YAML
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/spec.yaml"
+        with pytest.raises(SpecError, match="download limit"):
+            load_spec(url, max_bytes=1024)
+        load_spec(url, max_bytes=8192)  # the flag raises the cap above the body
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_download_timeout_is_configurable(tmp_path):
+    from specsentinel.spec import SpecError, load_spec
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            time.sleep(5)  # longer than the configured timeout
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/spec.yaml"
+        with pytest.raises(SpecError, match="timed out"):
+            load_spec(url, timeout=0.3)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_cli_spec_max_bytes_option(capsys, tmp_path):
+    body = (b"openapi: 3.0.3\n"
+            b'info: {title: api, version: "1"}\n'
+            b"paths: {}\n"
+            + b"# pad\n" * 300)
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/spec.yaml"
+        code, out = run(capsys, url, "--url", "http://127.0.0.1:1",
+                        "--spec-max-bytes", "1024", "--timeout", "2")
+        assert code == 2
+        assert "download limit" in out.err
     finally:
         server.shutdown()
         server.server_close()

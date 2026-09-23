@@ -22,7 +22,8 @@ from .swagger2 import translate as translate_swagger2
 
 URL_PREFIXES = ("http://", "https://")
 
-MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024  # cap remote specs, a broker could serve anything
+MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024  # default cap for remote specs, a broker could serve anything
+DOWNLOAD_TIMEOUT = 20.0                 # default seconds per remote spec request
 
 _OPENAPI_VERSION_RE = re.compile(r"^3\.\d+(\.\d+)?$")
 
@@ -57,7 +58,9 @@ class _Tagged(dict[str, Any]):
 class _Resolver:
     """Loads referenced documents on demand and caches them by canonical name."""
 
-    def __init__(self, root: SpecDocument) -> None:
+    def __init__(self, root: SpecDocument, max_bytes: int, timeout: float) -> None:
+        self._max_bytes = max_bytes
+        self._timeout = timeout
         self._cache = {_canonical(root._source): root}
 
     def document(self, source: str) -> SpecDocument:
@@ -65,7 +68,7 @@ class _Resolver:
         cached = self._cache.get(key)
         if cached is not None:
             return cached
-        doc = _load_document(key)
+        doc = _load_document(key, self._max_bytes, self._timeout)
         doc._resolver = self
         self._cache[key] = doc
         return doc
@@ -107,27 +110,28 @@ def _doc_of(node: Any) -> Any:
     return getattr(node, "_doc", None)
 
 
-def _download(source: str, exc_type: Type[Exception]) -> str:
+def _download(source: str, exc_type: Type[Exception],
+              max_bytes: int, timeout: float) -> str:
     try:
-        with urllib.request.urlopen(source, timeout=20) as response:
-            return _read_limited(response, source, exc_type).decode("utf-8")
+        with urllib.request.urlopen(source, timeout=timeout) as response:
+            return _read_limited(response, source, exc_type, max_bytes).decode("utf-8")
     except exc_type:
         raise
     except Exception as exc:  # network errors are reported, not raised raw
         raise exc_type(f"Could not load {source}: {exc}") from exc
 
 
-def _read_limited(response: Any, source: str, exc_type: Type[Exception]) -> bytes:
-    """Read the response body but stop at MAX_DOWNLOAD_BYTES, so a spec
-    served terabytes cannot exhaust the memory of the machine running the
-    check."""
+def _read_limited(response: Any, source: str, exc_type: Type[Exception],
+                  max_bytes: int) -> bytes:
+    """Read the response body but stop at ``max_bytes``, so a spec served
+    terabytes cannot exhaust the memory of the machine running the check."""
     chunks = []
     total = 0
     while current := response.read(64 * 1024):
         total += len(current)
-        if total > MAX_DOWNLOAD_BYTES:
+        if total > max_bytes:
             raise exc_type(f"Spec {source} exceeds the download limit "
-                           f"of {MAX_DOWNLOAD_BYTES} bytes")
+                           f"of {max_bytes} bytes")
         chunks.append(current)
     return b"".join(chunks)
 
@@ -145,9 +149,10 @@ def _parse(text: str, label: str, exc_type: Type[Exception]) -> dict[str, Any]:
     return data
 
 
-def _load_document(source: str) -> SpecDocument:
+def _load_document(source: str, max_bytes: int = MAX_DOWNLOAD_BYTES,
+                   timeout: float = DOWNLOAD_TIMEOUT) -> SpecDocument:
     if source.startswith(URL_PREFIXES):
-        text = _download(source, RefLoadError)
+        text = _download(source, RefLoadError, max_bytes, timeout)
     else:
         path = Path(source)
         if not path.is_file():
@@ -162,9 +167,10 @@ def _load_document(source: str) -> SpecDocument:
     return doc
 
 
-def load_spec(source: str) -> SpecDocument:
+def load_spec(source: str, max_bytes: int = MAX_DOWNLOAD_BYTES,
+              timeout: float = DOWNLOAD_TIMEOUT) -> SpecDocument:
     if source.startswith(URL_PREFIXES):
-        text = _download(source, SpecError)
+        text = _download(source, SpecError, max_bytes, timeout)
     else:
         path = Path(source)
         if not path.is_file():
@@ -195,7 +201,7 @@ def load_spec(source: str) -> SpecDocument:
 
     doc = SpecDocument(data)
     doc._source = source
-    doc._resolver = _Resolver(doc)
+    doc._resolver = _Resolver(doc, max_bytes, timeout)
     doc._skip_reasons = skip_reasons
     doc._openapi_version = openapi_version
     return doc
