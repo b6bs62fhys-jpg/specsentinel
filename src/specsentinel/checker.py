@@ -121,6 +121,11 @@ def _validate_constraints(schema: dict[str, Any], value: Any, path: str) -> list
     """Check formats, lengths, ranges and patterns. Returns warnings only."""
     out: list[Finding] = []
 
+    if "const" in schema and not enum_contains([schema["const"]], value):
+        out.append(Finding(WARNING, "CONST_MISMATCH", path,
+                           f"value {json.dumps(value)} does not match const "
+                           f"{json.dumps(schema['const'])}"))
+
     if isinstance(value, str):
         fmt = schema.get("format")
         check = _FORMAT_CHECKS.get(fmt) if isinstance(fmt, str) else None
@@ -143,12 +148,39 @@ def _validate_constraints(schema: dict[str, Any], value: Any, path: str) -> list
                 pass  # invalid pattern in the spec, skip the check
 
     if _is_number(value):
-        if isinstance(schema.get("minimum"), (int, float)) and value < schema["minimum"]:
-            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
-                               f"number {value} is below minimum {schema['minimum']}"))
-        if isinstance(schema.get("maximum"), (int, float)) and value > schema["maximum"]:
-            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
-                               f"number {value} is above maximum {schema['maximum']}"))
+        minimum = schema.get("minimum")
+        if isinstance(minimum, (int, float)):
+            # in OpenAPI 3.0 exclusiveMinimum is a boolean modifier on minimum
+            if schema.get("exclusiveMinimum") is True:
+                if value <= minimum:
+                    out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                       f"number {value} is not above exclusiveMinimum {minimum}"))
+            elif value < minimum:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is below minimum {minimum}"))
+        elif isinstance(schema.get("exclusiveMinimum"), (int, float)):
+            # in OpenAPI 3.1 exclusiveMinimum is a number on its own
+            if value <= schema["exclusiveMinimum"]:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is not above exclusiveMinimum "
+                                   f"{schema['exclusiveMinimum']}"))
+
+        maximum = schema.get("maximum")
+        if isinstance(maximum, (int, float)):
+            # in OpenAPI 3.0 exclusiveMaximum is a boolean modifier on maximum
+            if schema.get("exclusiveMaximum") is True:
+                if value >= maximum:
+                    out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                       f"number {value} is not below exclusiveMaximum {maximum}"))
+            elif value > maximum:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is above maximum {maximum}"))
+        elif isinstance(schema.get("exclusiveMaximum"), (int, float)):
+            # in OpenAPI 3.1 exclusiveMaximum is a number on its own
+            if value >= schema["exclusiveMaximum"]:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is not below exclusiveMaximum "
+                                   f"{schema['exclusiveMaximum']}"))
 
     return out
 

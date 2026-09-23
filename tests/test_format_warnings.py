@@ -108,6 +108,55 @@ def test_number_range_applies_to_floats_too():
     assert codes(validate_value(SPEC, schema, 2.6, "b")) == ["RANGE_MISMATCH"]
 
 
+def test_const_matching_value_passes():
+    schema = {"type": "string", "const": "active"}
+    assert validate_value(SPEC, schema, "active", "b") == []
+
+
+def test_const_mismatch_is_a_warning():
+    schema = {"type": "string", "const": "active"}
+    result = validate_value(SPEC, schema, "disabled", "b")
+    assert codes(result) == ["CONST_MISMATCH"]
+    assert result[0].severity == WARNING
+    assert "does not match const" in result[0].message
+
+
+def test_const_applies_to_numbers_too():
+    schema = {"type": "integer", "const": 7}
+    assert validate_value(SPEC, schema, 7, "b") == []
+    assert codes(validate_value(SPEC, schema, 8, "b")) == ["CONST_MISMATCH"]
+
+
+def test_numeric_exclusive_minimum():
+    schema = {"type": "integer", "exclusiveMinimum": 5}
+    assert validate_value(SPEC, schema, 6, "b") == []
+    result = validate_value(SPEC, schema, 5, "b")
+    assert codes(result) == ["RANGE_MISMATCH"]
+    assert "not above exclusiveMinimum 5" in result[0].message
+    assert codes(validate_value(SPEC, schema, 4, "b")) == ["RANGE_MISMATCH"]
+
+
+def test_numeric_exclusive_maximum():
+    schema = {"type": "integer", "exclusiveMaximum": 10}
+    assert validate_value(SPEC, schema, 9, "b") == []
+    result = validate_value(SPEC, schema, 10, "b")
+    assert codes(result) == ["RANGE_MISMATCH"]
+    assert "not below exclusiveMaximum 10" in result[0].message
+    assert codes(validate_value(SPEC, schema, 11, "b")) == ["RANGE_MISMATCH"]
+
+
+def test_swagger30_boolean_exclusive_minimum_with_minimum():
+    schema = {"type": "integer", "minimum": 5, "exclusiveMinimum": True}
+    assert validate_value(SPEC, schema, 6, "b") == []
+    assert codes(validate_value(SPEC, schema, 5, "b")) == ["RANGE_MISMATCH"]
+
+
+def test_swagger30_boolean_exclusive_maximum_with_maximum():
+    schema = {"type": "integer", "maximum": 10, "exclusiveMaximum": True}
+    assert validate_value(SPEC, schema, 9, "b") == []
+    assert codes(validate_value(SPEC, schema, 10, "b")) == ["RANGE_MISMATCH"]
+
+
 def test_pattern_matches_and_does_not():
     schema = {"type": "string", "pattern": r"^\d{4}-[A-Z]{2}$"}
     assert validate_value(SPEC, schema, "1234-AB", "b") == []
