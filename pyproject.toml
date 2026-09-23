@@ -28,7 +28,7 @@ Issues = "https://github.com/b6bs62fhys-jpg/specsentinel/issues"
 Changelog = "https://github.com/b6bs62fhys-jpg/specsentinel/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "mypy>=1", "types-PyYAML"]
 
 [project.scripts]
 specsentinel = "specsentinel.cli:main"
@@ -38,3 +38,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+files = ["src/specsentinel"]
