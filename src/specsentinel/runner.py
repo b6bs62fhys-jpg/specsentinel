@@ -56,6 +56,7 @@ class Report:
     strict: bool = False
     baseline_loaded: bool = False
     fixed: list[dict[str, Any]] = field(default_factory=list)
+    openapi_version: str = ""
 
     @property
     def baselined_count(self) -> int:
@@ -250,4 +251,5 @@ def run_check(spec: dict[str, Any], base_url: str, *,
             result.skipped = f"spec problem: {exc}"
             result.status = None
 
-    return Report(results=results, strict=strict)
+    return Report(results=results, strict=strict,
+                  openapi_version=getattr(spec, "_openapi_version", ""))

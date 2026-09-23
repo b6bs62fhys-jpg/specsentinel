@@ -10,6 +10,7 @@ absolute URLs.
 from __future__ import annotations
 
 import json
+import re
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -22,6 +23,8 @@ from .swagger2 import translate as translate_swagger2
 URL_PREFIXES = ("http://", "https://")
 
 MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024  # cap remote specs, a broker could serve anything
+
+_OPENAPI_VERSION_RE = re.compile(r"^3\.\d+(\.\d+)?$")
 
 
 class SpecError(Exception):
@@ -38,6 +41,7 @@ class SpecDocument(dict[str, Any]):
     _source: str = ""
     _resolver: "_Resolver | None" = None
     _skip_reasons: "dict[str, str]" = {}
+    _openapi_version: str = ""
 
 
 class _Tagged(dict[str, Any]):
@@ -172,20 +176,28 @@ def load_spec(source: str) -> SpecDocument:
 
     data = _parse(text, "Spec", SpecError)
     skip_reasons: dict[str, str] = {}
+    openapi_version = ""
     if "swagger" in data:
         version = str(data.get("swagger"))
         if version != "2.0":
             raise SpecError(f"Unsupported Swagger version {version}. "
                             "Only Swagger 2.0 is supported.")
+        openapi_version = f"swagger {version}"
         data, skip_reasons = translate_swagger2(data)
     elif "openapi" not in data:
         raise SpecError("Spec has no 'openapi' or 'swagger' field. "
                         "Is this an OpenAPI 3.x or Swagger 2.0 document?")
+    else:
+        openapi_version = str(data.get("openapi"))
+        if _OPENAPI_VERSION_RE.match(openapi_version) is None:
+            raise SpecError(f"Unsupported OpenAPI version {openapi_version}. "
+                            "Only OpenAPI 3.x is supported.")
 
     doc = SpecDocument(data)
     doc._source = source
     doc._resolver = _Resolver(doc)
     doc._skip_reasons = skip_reasons
+    doc._openapi_version = openapi_version
     return doc
 
 

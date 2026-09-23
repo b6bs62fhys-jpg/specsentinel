@@ -66,6 +66,7 @@ def render_json(report: Report, spec_source: str, base_url: str) -> str:
         "version": __version__,
         "spec": spec_source,
         "target": base_url,
+        "openapi_version": report.openapi_version or None,
         "strict": report.strict,
         "exit_code": report.exit_code(),
         "summary": {
