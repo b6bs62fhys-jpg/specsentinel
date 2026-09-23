@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 (unveröffentlicht)
+
+### Added
+
+- The OpenAPI version of the checked spec is now validated and reported.
+  `openapi` must be `3.x`; the reported version is available as
+  `openapi_version` in the JSON output (for Swagger 2.0 sources it reads
+  `swagger 2.0`).
+- `const` and `exclusiveMinimum`/`exclusiveMaximum` are now checked. `const`
+  mismatches are reported as `CONST_MISMATCH`; numeric exclusive boundaries
+  (OpenAPI 3.1) and boolean modifiers on `minimum`/`maximum` (OpenAPI 3.0) as
+  `RANGE_MISMATCH`.
+- The `date` and `byte` string formats are now validated. `date` must be a
+  full date (RFC 3339), `byte` a base64 encoded string; violations are
+  reported as `FORMAT_MISMATCH`.
+- `--spec-max-bytes BYTES` and `--spec-timeout SECONDS` make the download of
+  remote specs and referenced documents configurable. The default limit is
+  50 MiB and the default timeout 20 seconds.
+
 ## [Unreleased]
 
 ### Added
