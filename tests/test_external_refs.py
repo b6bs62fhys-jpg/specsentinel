@@ -304,6 +304,37 @@ def test_relative_refs_for_url_loaded_spec(tmp_path):
         server.server_close()
 
 
+def test_download_over_size_limit_is_rejected(tmp_path):
+    from specsentinel import spec as spec_module
+    from specsentinel.spec import SpecError, load_spec
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b"x" * (spec_module.MAX_DOWNLOAD_BYTES + 1)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/big.yaml"
+        # an oversized remote document must not exhaust memory
+        try:
+            load_spec(url)
+            raise AssertionError("load_spec should have failed")
+        except SpecError as exc:
+            assert "download limit" in str(exc)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_same_file_referenced_twice(tmp_path):
     _write(tmp_path, "schemas.yaml", SCHEMAS)
     spec = load_spec(str(_write(tmp_path, "main.yaml", MAIN_TWICE)))

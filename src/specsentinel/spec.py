@@ -20,6 +20,8 @@ from .swagger2 import translate as translate_swagger2
 
 URL_PREFIXES = ("http://", "https://")
 
+MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024  # cap remote specs, a broker could serve anything
+
 
 class SpecError(Exception):
     """The spec could not be loaded or understood."""
@@ -97,9 +99,26 @@ def _doc_of(node):
 def _download(source: str, exc_type) -> str:
     try:
         with urllib.request.urlopen(source, timeout=20) as response:
-            return response.read().decode("utf-8")
+            return _read_limited(response, source, exc_type).decode("utf-8")
+    except exc_type:
+        raise
     except Exception as exc:  # network errors are reported, not raised raw
         raise exc_type(f"Could not load {source}: {exc}") from exc
+
+
+def _read_limited(response, source: str, exc_type) -> bytes:
+    """Read the response body but stop at MAX_DOWNLOAD_BYTES, so a spec
+    served terabytes cannot exhaust the memory of the machine running the
+    check."""
+    chunks = []
+    total = 0
+    while current := response.read(64 * 1024):
+        total += len(current)
+        if total > MAX_DOWNLOAD_BYTES:
+            raise exc_type(f"Spec {source} exceeds the download limit "
+                           f"of {MAX_DOWNLOAD_BYTES} bytes")
+        chunks.append(current)
+    return b"".join(chunks)
 
 
 def _parse(text: str, label: str, exc_type) -> dict:
