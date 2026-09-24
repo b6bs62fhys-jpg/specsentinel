@@ -5,10 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.0 (unveröffentlicht)
+## [Unreleased]
+
+## [0.3.0] - 2026-09-24
 
 ### Added
 
+- `--write-baseline FILE` records every current finding as a JSON baseline.
+  `--baseline FILE` accepts those findings, so only new drift fails. Findings
+  are matched by method, path, code and location, not by message. Accepted
+  findings are counted as `baselined` and no longer affect the exit code.
+  Baseline entries that no longer occur are reported as `fixed`. A run that
+  writes the baseline exits 0 once the file is written.
+- `--include PATTERN` and `--exclude PATTERN` select which paths are checked.
+  Both take a path pattern with `*` as a wildcard and can be repeated. An
+  excluded operation is reported as SKIPPED with the reason `excluded`, does
+  not change the exit code and appears in the JSON output.
+- `--delay SECONDS` waits between two requests, default 0.
+- Swagger 2.0 documents are translated to OpenAPI 3 in memory, so paths,
+  path/query/header parameters, responses, `definitions` and top level
+  `responses` can be checked. Each response media type gets its own entry in
+  `content`, and `x-nullable: true` becomes `nullable: true`. The base URL
+  still comes from `--url`. An operation that cannot be translated (for
+  example `type: file` or a body parameter) is reported as SKIPPED with a
+  clear reason instead of stopping the run.
 - The OpenAPI version of the checked spec is now validated and reported.
   `openapi` must be `3.x`; the reported version is available as
   `openapi_version` in the JSON output (for Swagger 2.0 sources it reads
@@ -23,34 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--spec-max-bytes BYTES` and `--spec-timeout SECONDS` make the download of
   remote specs and referenced documents configurable. The default limit is
   50 MiB and the default timeout 20 seconds.
-
-## [Unreleased]
-
-### Added
-
-- `--include PATTERN` and `--exclude PATTERN` select which paths are checked.
-  Both take a path pattern with `*` as a wildcard and can be repeated. An
-  excluded operation is reported as SKIPPED with the reason `excluded`, does
-  not change the exit code and appears in the JSON output.
-- `--delay SECONDS` waits between two requests, default 0.
-- Swagger 2.0 documents are translated to OpenAPI 3 in memory, so paths,
-  path/query/header parameters, responses, `definitions` and top level
-  `responses` can be checked. Each response media type gets its own entry in
-  `content`, and `x-nullable: true` becomes `nullable: true`. The base URL
-  still comes from `--url`. An operation that cannot be translated (for
-  example `type: file` or a body parameter) is reported as SKIPPED with a
-  clear reason instead of stopping the run.
-
-## [0.3.0] - 2026-09-21
-
-### Added
-
-- `--write-baseline FILE` records every current finding as a JSON baseline.
-  `--baseline FILE` accepts those findings, so only new drift fails. Findings
-  are matched by method, path, code and location, not by message. Accepted
-  findings are counted as `baselined` and no longer affect the exit code.
-  Baseline entries that no longer occur are reported as `fixed`. A run that
-  writes the baseline exits 0 once the file is written.
 
 ### Changed
 
