@@ -263,6 +263,11 @@ not written to the log), `params_file`, `strict` (default `false`),
 SpecSentinel release that gets installed, for example `0.3.0`. When it is
 empty, the latest release is installed.
 
+Not yet in the `v0.3.0` action tag, available from the next action release:
+the `summary` input (default `true`) writes a job summary with the result, the
+counts and the operations with drift, and adds one annotation per drifting
+operation, so drift is visible in the pull request without opening the log.
+
 ## Tested against real specifications
 
 

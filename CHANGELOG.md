@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The GitHub Action writes a job summary (result, counts, operations with
+  drift, full report) and one annotation per drifting operation. The new
+  `summary` input (default `true`) turns this off. The exit code is passed
+  through unchanged, and report lines can no longer be read as workflow
+  commands. Works with every pinned SpecSentinel version, because it reads
+  the text report.
+
 ### Fixed
 
 - Errors in the params file and the baseline file now always name the file
