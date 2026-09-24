@@ -1,11 +1,19 @@
 # SpecSentinel
 
+SpecSentinel checks a running API against its OpenAPI 3.x or Swagger 2.0 document: it calls every GET operation, compares each response with the spec and reports drift such as missing fields, wrong types or undocumented status codes. It is for teams that publish an API spec and want their CI to fail as soon as the live API no longer matches it (exit code 0 match, 1 drift, 2 check could not run). Excerpt of a real run against the demo API in `examples/`, full output below:
+
+```
+$ specsentinel examples/petstore.yaml --url http://127.0.0.1:8099
+GET /pets/{petId}      200  DRIFT
+    error   MISSING_FIELD            body.name
+[...]
+Result: DRIFT (exit code 1)
+```
+
 [![PyPI](https://img.shields.io/pypi/v/specsentinel)](https://pypi.org/project/specsentinel/)
 [![Python](https://img.shields.io/pypi/pyversions/specsentinel)](https://pypi.org/project/specsentinel/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![tests](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/b6bs62fhys-jpg/specsentinel/actions/workflows/ci.yml)
-
-SpecSentinel checks a running API against its OpenAPI document. It calls every GET operation, compares each response with the spec and reports where the two disagree, from missing fields and wrong types to undocumented status codes. The exit code tells a pipeline what happened: 0 for a match, 1 for drift and 2 if the check could not be completed.
 
 ## What it is for
 
@@ -49,15 +57,16 @@ GET /pets/{petId}      200  DRIFT
             field is returned but not described in the spec
 GET /stats             503  DRIFT
     error   UNDOCUMENTED_STATUS      status
-            status 503 is not documented (documented: 200)
+            status 503 is not documented (documented: 200) (in paths./stats.get.responses)
 GET /owners/{ownerId}  -    SKIPPED
-    no example value for path parameter 'ownerId' (pass --param ownerId=VALUE)
+    no example value for path parameter 'ownerId' (pass --param ownerId=VALUE or use --params-file)
 
 4 checked, 2 with drift, 1 skipped, 0 failed
+Skipped operations were not checked.
 Result: DRIFT (exit code 1)
 ```
 
-Start the demo with `--conform` and the same command ends with `Result: MATCH (exit code 0)`.
+Start the demo with `--conform` and the same command ends with `Result: MATCH (exit code 0)`. More runnable examples, including a baseline flow and a Swagger 2.0 source, are in [`examples/`](examples/README.md).
 
 ## New in 0.2.0
 

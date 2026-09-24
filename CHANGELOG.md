@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The README now opens with what SpecSentinel does, for whom, and an excerpt
+  of a real run. The "Real output" block was out of date (it predated the
+  `(in ...)` locations and the skipped notice of 0.3.0) and is replaced with
+  the current output; a test compares both with a real run.
 - Errors in the params file and the baseline file now always name the file
   and the place inside it, in the same `(in ...)` style as spec errors, for
   example `(in findings[1].code)`. A params or baseline file that cannot be
