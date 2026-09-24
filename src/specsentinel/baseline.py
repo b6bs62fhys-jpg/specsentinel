@@ -41,25 +41,33 @@ def load_baseline(path: str) -> list[dict[str, str]]:
         raise BaselineError(f"Baseline file not found: {path}")
     try:
         text = file.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise BaselineError(f"Could not read baseline file {path}: {exc}") from exc
+    except (OSError, UnicodeDecodeError) as exc:
+        raise BaselineError(f"Baseline file {path} could not be read: {exc}") from exc
     try:
         data = json.loads(text)
     except ValueError as exc:
         raise BaselineError(f"Baseline file {path} is not valid JSON: {exc}") from exc
-    if not isinstance(data, dict) or not isinstance(data.get("findings"), list):
+    if not isinstance(data, dict):
         raise BaselineError(
-            f"Baseline file {path} must be a JSON object with a 'findings' list."
+            f"Baseline file {path} must be a JSON object with a 'findings' list (in the top level)."
+        )
+    if not isinstance(data.get("findings"), list):
+        raise BaselineError(
+            f"Baseline file {path} must be a JSON object with a 'findings' list (in findings)."
         )
     entries = []
-    for item in data["findings"]:
-        if not isinstance(item, dict) or any(
-            not isinstance(item.get(field), str) for field in REQUIRED_FIELDS
-        ):
+    for index, item in enumerate(data["findings"]):
+        if not isinstance(item, dict):
             raise BaselineError(
-                f"Baseline file {path}: every finding needs the string fields "
-                "method, path, code and location."
+                f"Baseline file {path}: every finding must be an object with the string fields "
+                f"method, path, code and location (in findings[{index}])."
             )
+        for field in REQUIRED_FIELDS:
+            if not isinstance(item.get(field), str):
+                raise BaselineError(
+                    f"Baseline file {path}: every finding needs the string fields "
+                    f"method, path, code and location (in findings[{index}].{field})."
+                )
         entries.append(_clean(item))
     return entries
 

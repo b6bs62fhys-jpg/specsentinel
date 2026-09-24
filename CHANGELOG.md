@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Errors in the params file and the baseline file now always name the file
+  and the place inside it, in the same `(in ...)` style as spec errors, for
+  example `(in findings[1].code)`. A params or baseline file that cannot be
+  read (no permission, not UTF-8) now ends with exit code 2 and a clear
+  message instead of a traceback. The exit codes and the JSON format are
+  unchanged.
+
 ### Changed
 
 - CI now also runs the tests and the type check on Python 3.13 and 3.14.

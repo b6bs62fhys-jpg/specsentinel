@@ -95,18 +95,23 @@ def _load_params_file(path: str) -> tuple[dict[str, Any], dict[str, dict[str, An
     file = Path(path)
     if not file.is_file():
         raise ValueError(f"Params file not found: {path}")
-    text = file.read_text(encoding="utf-8")
+    try:
+        text = file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(f"Params file {path} could not be read: {exc}") from exc
     try:
         data = json.loads(text)
     except ValueError:
         try:
             data = yaml.safe_load(text)
         except yaml.YAMLError as exc:
-            raise ValueError(f"Params file is not valid JSON or YAML: {exc}") from exc
+            raise ValueError(f"Params file {path} is not valid JSON or YAML: {exc}") from exc
     if data is None:
         data = {}
     if not isinstance(data, dict):
-        raise ValueError("Params file must be a mapping of parameter names to values.")
+        raise ValueError(
+            f"Params file {path} must be a mapping of parameter names to values (in the top level)."
+        )
 
     defaults: dict[str, Any] = {}
     per_operation: dict[str, dict[str, Any]] = {}
