@@ -125,6 +125,95 @@ von Fahrplan 3 aufnehmen.
 **158 passed**, mypy: **Success: no issues found in 9 source files**. Grüne
 Läufe vor jedem Commit.
 
+## Nachtrag „Ausbau" (TEIL D–G), 2026-09-24
+
+Neuer Branch `ausbau-2026-09-24` (von `pflege-2026-09-23` = `de258ec`).
+Weiterhin kein Push, kein Merge nach `main`, kein Release, keine
+Versionsänderung.
+
+### TEIL D: `origin/main` in den Branch mergen
+
+- **Ergebnis:** Merge-Commit `a2cc021`, Code war konfliktfrei
+  (`git diff --name-status pflege-2026-09-23 origin/main` zeigte vorab, dass
+  nur `CHANGELOG.md` divergierte). Einziger Konflikt inhaltlicher Art:
+  `CHANGELOG.md`.
+- **Aufgelöster Konflikt:** `pflege-2026-09-23` trug einen eigenen Abschnitt
+  `## 0.3.0 (unveröffentlicht)` (Fahrplan-Einträge), `main` hat dieselben
+  Inhalte bereits in `## [0.3.0] - 2026-09-24` veröffentlicht. Lösung wie
+  vorgegeben: pflege-Abschnitt verworfen, `[0.3.0]`-Abschnitt von `main`
+  unverändert, oben steht der leere `## [Unreleased]`. `CHANGELOG.md` ist damit
+  byte-identisch mit `origin/main`.
+- Der automatische Ort-Merge (`e53ac04`) wurde verworfen und nach Auflösung neu
+  als echter Zwei-Eltern-Merge erstellt, damit `origin/main` Ancestor bleibt.
+- **Reihenfolge eingehalten:** erst volle Tests + mypy grün (158 passed,
+  mypy Success), danach der Merge-Commit.
+
+### TEIL E: CI nachschärfen
+
+- `ci.yml`: `mypy src/specsentinel` ist jetzt ein eigener benannter Schritt
+  (`Type check (mypy)`); `pytest` ebenso (`Tests`).
+- Actions auf Node-24-Versionen angehoben (die alten zielten auf Node 20):
+  - `actions/checkout@v4` → **`@v5`** (Node 24, Runner ≥ 2.327.1) in
+    `ci.yml`, `action_test.yml`, `publish.yml`
+  - `actions/setup-python@v5` → **`@v6`** (Node 24, v6.0.0) in `ci.yml`,
+    `publish.yml` und `action.yml`
+  - `actions/upload-artifact@v4` → **`@v6`** (v6 ist die erste Node-24-Version;
+    v5 lief noch auf Node 20) in `publish.yml`
+  - `actions/download-artifact@v4` → **`@v7`** (erste Node-24-Version; v5/v6
+    liefen noch auf Node 20) in `publish.yml`
+  - `publish.yml`: ausschließlich Versionsnummern geändert.
+- `ubuntu-latest` migriert laut GitHub (Changelog 2026-09-17, Issue #14748)
+  zwischen **19.10. und 19.11.2026** von Ubuntu 24.04 auf **26.04**. Für
+  SpecSentinel ist das Risiko gering: CI installiert Python über
+  `setup-python@v6`, Tests + mypy laufen in einer frischen venv aus
+  `.[dev]`; es gibt keine Abhängigkeit von vorinstallierten Systempaketen.
+  **Empfehlung:** `ubuntu-latest` beibehalten, die Migration beobachten; nur
+  festpinnen (`ubuntu-24.04`), falls ein Lauf Ende Oktober 2026 unerwartet
+  bricht. Kein aktueller Grund zum Pinnen.
+
+### TEIL F
+
+**a) `action.yml` – welche SpecSentinel-Version wird installiert?**
+
+- `action.yml` pinnt **keine** Version: Der Input `version` hat den leeren
+  Default, ohne Wert wird `pip install specsentinel` = neueste PyPI-Version
+  genutzt. Damit gibt es **keine feste Nummer, die bei 0.3.0 veraltet wäre**.
+  Die Beispielangabe in der `version`-Beschreibung lautet bereits „0.3.0"
+  (seit Release `54f25c8`). **Kein Handlungsbedarf, keine Änderung.**
+- Einziger Randfund: `action_test.yml` pinnt in einem Testfall bewusst
+  `version: "0.1.1"` (Absicht: Pinning-Verhalten testen, berücksichtigt die
+  aktuelle Version nicht). Bewusst unverändert — er verifiziert den
+  Pinning-Pfad, nicht die Default-Version.
+- Konsistenz mit der Projekt-Versionspflicht wird durch
+  `tests/test_version_consistency.py` sichergestellt (s. u.).
+
+**b) Versionskonsistenz-Test** — `tests/test_version_consistency.py` (neu):
+- `pyproject.toml`-`version` == `src/specsentinel/__init__.py`-`__version__`
+  (zwingend).
+- Jede in `action.yml` vorkommende Fest-Pin (`specsentinel==X`) muss zur
+  Projektversion passen (greift, sobald jemand einen Default setzt);
+  aktuell kein Pin → Test grün.
+- Läuft als Teil von `pytest` in `ci.yml`, schlägt also in CI fehl; von Hand
+  verifiziert, dass er bei Version-0.3.0/„9.9.9"-Abweichung rot wird.
+
+**c) `docs/release.md`** (neu): exakte Release-Schritte — Versionsstellen
+(`pyproject.toml`, `__init__.py`), optionale `action.yml`-Pin, CHANGELOG-Umbau
+von `[Unreleased]` zu `[0.x.0]`, PR/Merge, GitHub-Release + Tag `v0.x.0`,
+publish-Pipeline. **Warnhinweis:** Die Veröffentlichung des GitHub Release
+lädt sofort und unumkehrbar auf PyPI hoch (`publish.yml`, Trusted Publishing).
+
+### Testergebnis (Endstand Nachtrag)
+
+**160 passed**, mypy: **Success: no issues found in 9 source files**. (158 vor,
++2 Versionskonsistenz-Tests.)
+
+### Drei Stellen, zuerst zu lesen
+
+1. `docs/bericht.md` (dieser Abschnitt „Nachtrag Ausbau") – Kontext des Branches.
+2. `docs/release.md` – Release-Ablauf mit dem PyPI-Soforthochladen-Hinweis.
+3. `tests/test_version_consistency.py` – die neue Versionskonsistenz-Sicherung
+   samt zugehörigem CI-Effekt.
+
 ## „Unklar" / offene Punkte
 
 - **OpenAPI-Version:** `spec.py` prüft nur das Vorhandensein von `openapi`,
