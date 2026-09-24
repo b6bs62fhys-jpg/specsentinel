@@ -4,10 +4,10 @@ from __future__ import annotations
 import json
 
 from . import __version__
-from .runner import Report
+from .runner import OperationResult, Report
 
 
-def _state(result, strict: bool) -> str:
+def _state(result: OperationResult, strict: bool) -> str:
     if result.skipped is not None:
         return "SKIPPED"
     if result.error is not None:
@@ -53,7 +53,7 @@ def render_text(report: Report, spec_source: str, base_url: str) -> str:
     return "\n".join(lines)
 
 
-def _severity_counts(report: Report) -> dict:
+def _severity_counts(report: Report) -> dict[str, int]:
     counts = {"error": 0, "warning": 0}
     for result in report.results:
         for finding in result.findings:
@@ -66,6 +66,7 @@ def render_json(report: Report, spec_source: str, base_url: str) -> str:
         "version": __version__,
         "spec": spec_source,
         "target": base_url,
+        "openapi_version": report.openapi_version or None,
         "strict": report.strict,
         "exit_code": report.exit_code(),
         "summary": {

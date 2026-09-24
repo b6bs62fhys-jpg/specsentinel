@@ -79,6 +79,14 @@ def test_the_swagger2_example_matches_a_conforming_server(start_server):
     assert main([str(EXAMPLE), "--url", url]) == 0
 
 
+def test_swagger_version_is_reported_as_swagger_2_0(start_server, capsys):
+    url = start_server(drift=False)
+    code = main([str(EXAMPLE), "--url", url, "--format", "json"])
+    assert code == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["openapi_version"] == "swagger 2.0"
+
+
 def test_definitions_become_components_schemas():
     spec = load_spec(str(EXAMPLE))
     assert "definitions" not in spec

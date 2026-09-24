@@ -1,10 +1,12 @@
 """Compare one live HTTP response with the OpenAPI operation that describes it."""
 from __future__ import annotations
 
+import base64
 import json
 import re
 import uuid
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 from .spec import deref
@@ -27,7 +29,7 @@ class Finding:
 # type helpers
 # --------------------------------------------------------------------------
 
-def type_of(value) -> str:
+def type_of(value: Any) -> str:
     if value is None:
         return "null"
     if isinstance(value, bool):  # bool is a subclass of int, check it first
@@ -45,7 +47,7 @@ def type_of(value) -> str:
     return type(value).__name__
 
 
-def type_matches(expected: str, value) -> bool:
+def type_matches(expected: str, value: Any) -> bool:
     actual = type_of(value)
     if expected == actual:
         return True
@@ -56,7 +58,7 @@ def type_matches(expected: str, value) -> bool:
     return False
 
 
-def enum_contains(options: list, value) -> bool:
+def enum_contains(options: list[Any], value: Any) -> bool:
     return any(type_of(o) == type_of(value) and o == value for o in options)
 
 
@@ -91,6 +93,31 @@ def _is_datetime(value: str) -> bool:
     )
 
 
+_DATE_RE = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})$")
+
+
+def _is_date(value: str) -> bool:
+    """RFC 3339 full-date. The month/day bounds are the same as _is_datetime's."""
+    match = _DATE_RE.match(value)
+    if match is None:
+        return False
+    return (
+        1 <= int(match["month"]) <= 12
+        and 1 <= int(match["day"]) <= 31
+    )
+
+
+def _is_base64(value: str) -> bool:
+    """RFC 4648 base64. Whitespace is not allowed, padding is optional."""
+    if not value:
+        return True
+    try:
+        base64.b64decode(value.encode("ascii"), validate=True)
+        return True
+    except (ValueError, UnicodeEncodeError):
+        return False
+
+
 def _is_uuid(value: str) -> bool:
     try:
         uuid.UUID(value)
@@ -106,19 +133,26 @@ def _is_uri(value: str) -> bool:
 
 _FORMAT_CHECKS = {
     "date-time": _is_datetime,
+    "date": _is_date,
     "uuid": _is_uuid,
     "email": lambda v: _EMAIL_RE.fullmatch(v) is not None,
     "uri": _is_uri,
+    "byte": _is_base64,
 }
 
 
-def _is_number(value) -> bool:
+def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _validate_constraints(schema: dict, value, path: str) -> list[Finding]:
+def _validate_constraints(schema: dict[str, Any], value: Any, path: str) -> list[Finding]:
     """Check formats, lengths, ranges and patterns. Returns warnings only."""
     out: list[Finding] = []
+
+    if "const" in schema and not enum_contains([schema["const"]], value):
+        out.append(Finding(WARNING, "CONST_MISMATCH", path,
+                           f"value {json.dumps(value)} does not match const "
+                           f"{json.dumps(schema['const'])}"))
 
     if isinstance(value, str):
         fmt = schema.get("format")
@@ -142,12 +176,39 @@ def _validate_constraints(schema: dict, value, path: str) -> list[Finding]:
                 pass  # invalid pattern in the spec, skip the check
 
     if _is_number(value):
-        if isinstance(schema.get("minimum"), (int, float)) and value < schema["minimum"]:
-            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
-                               f"number {value} is below minimum {schema['minimum']}"))
-        if isinstance(schema.get("maximum"), (int, float)) and value > schema["maximum"]:
-            out.append(Finding(WARNING, "RANGE_MISMATCH", path,
-                               f"number {value} is above maximum {schema['maximum']}"))
+        minimum = schema.get("minimum")
+        if isinstance(minimum, (int, float)):
+            # in OpenAPI 3.0 exclusiveMinimum is a boolean modifier on minimum
+            if schema.get("exclusiveMinimum") is True:
+                if value <= minimum:
+                    out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                       f"number {value} is not above exclusiveMinimum {minimum}"))
+            elif value < minimum:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is below minimum {minimum}"))
+        elif isinstance(schema.get("exclusiveMinimum"), (int, float)):
+            # in OpenAPI 3.1 exclusiveMinimum is a number on its own
+            if value <= schema["exclusiveMinimum"]:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is not above exclusiveMinimum "
+                                   f"{schema['exclusiveMinimum']}"))
+
+        maximum = schema.get("maximum")
+        if isinstance(maximum, (int, float)):
+            # in OpenAPI 3.0 exclusiveMaximum is a boolean modifier on maximum
+            if schema.get("exclusiveMaximum") is True:
+                if value >= maximum:
+                    out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                       f"number {value} is not below exclusiveMaximum {maximum}"))
+            elif value > maximum:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is above maximum {maximum}"))
+        elif isinstance(schema.get("exclusiveMaximum"), (int, float)):
+            # in OpenAPI 3.1 exclusiveMaximum is a number on its own
+            if value >= schema["exclusiveMaximum"]:
+                out.append(Finding(WARNING, "RANGE_MISMATCH", path,
+                                   f"number {value} is not below exclusiveMaximum "
+                                   f"{schema['exclusiveMaximum']}"))
 
     return out
 
@@ -156,7 +217,7 @@ def _validate_constraints(schema: dict, value, path: str) -> list[Finding]:
 # schema handling
 # --------------------------------------------------------------------------
 
-def flatten_all_of(spec: dict, schema, depth: int = 0) -> dict:
+def flatten_all_of(spec: dict[str, Any], schema: Any, depth: int = 0) -> dict[str, Any]:
     """Merge allOf members into one schema so extra field detection is correct."""
     schema = deref(spec, schema)
     if not isinstance(schema, dict):
@@ -191,7 +252,7 @@ def _describe_types(types: list[str]) -> str:
     return " or ".join(types)
 
 
-def validate_value(spec: dict, schema, value, path: str, depth: int = 0) -> list[Finding]:
+def validate_value(spec: dict[str, Any], schema: Any, value: Any, path: str, depth: int = 0) -> list[Finding]:
     """Validate a JSON value against a schema. Returns findings, never raises."""
     if depth > 40:
         return []
@@ -264,7 +325,8 @@ def validate_value(spec: dict, schema, value, path: str, depth: int = 0) -> list
     return out
 
 
-def _validate_object(spec: dict, schema: dict, value: dict, path: str, depth: int) -> list[Finding]:
+def _validate_object(spec: dict[str, Any], schema: dict[str, Any],
+                     value: dict[str, Any], path: str, depth: int) -> list[Finding]:
     out: list[Finding] = []
     properties = schema.get("properties") or {}
     required = schema.get("required") or []
@@ -295,7 +357,7 @@ def _validate_object(spec: dict, schema: dict, value: dict, path: str, depth: in
 # response level checks
 # --------------------------------------------------------------------------
 
-def match_response(responses: dict, status: int):
+def match_response(responses: dict[str, Any], status: int) -> Any:
     """Find the documented response for a status: exact, then 2XX style, then default."""
     keys = {str(k).upper(): v for k, v in (responses or {}).items()}
     for candidate in (str(status), f"{status // 100}XX", "DEFAULT"):
@@ -304,7 +366,7 @@ def match_response(responses: dict, status: int):
     return None
 
 
-def pick_media_type(content: dict, content_type: str):
+def pick_media_type(content: dict[str, Any], content_type: str) -> Any:
     main = content_type.split(";")[0].strip().lower()
     for key in content:
         if key.lower() == main:
@@ -318,7 +380,8 @@ def pick_media_type(content: dict, content_type: str):
     return None
 
 
-def _check_required_headers(spec: dict, documented: dict, headers: dict) -> list[Finding]:
+def _check_required_headers(spec: dict[str, Any], documented: dict[str, Any],
+                            headers: dict[str, Any]) -> list[Finding]:
     """Warnings for response headers the spec marks as required but are missing."""
     declared = deref(spec, documented.get("headers") or {})
     if not isinstance(declared, dict):
@@ -335,16 +398,25 @@ def _check_required_headers(spec: dict, documented: dict, headers: dict) -> list
     return out
 
 
-def _check_response(spec: dict, operation: dict, status: int,
-                    headers: dict, body: bytes) -> list[Finding]:
+def _check_response(spec: dict[str, Any], operation: dict[str, Any], status: int,
+                    headers: dict[str, Any], body: bytes,
+                    spec_path: str | None = None) -> list[Finding]:
     """Return every difference between the live response and the operation's spec."""
     responses = deref(spec, operation.get("responses") or {})
     documented = match_response(responses, status)
 
+    def where(*keys: str) -> str:
+        """Human readable pointer into the spec, e.g. paths./pets/{petId}.get.responses.200."""
+        if not spec_path:
+            return ""
+        suffix = ".".join(keys)
+        return f" (in {spec_path}.{suffix})" if suffix else f" (in {spec_path})"
+
     if documented is None:
         listed = ", ".join(sorted(str(k) for k in responses)) or "none"
         return [Finding(ERROR, "UNDOCUMENTED_STATUS", "status",
-                        f"status {status} is not documented (documented: {listed})")]
+                        f"status {status} is not documented (documented: {listed})"
+                        f"{where('responses')}")]
 
     documented = deref(spec, documented)
     header_warnings = _check_required_headers(spec, documented, headers)
@@ -358,16 +430,19 @@ def _check_response(spec: dict, operation: dict, status: int,
     if not content_type:
         if not body:
             return header_warnings + [Finding(ERROR, "EMPTY_BODY", "body",
-                            "the spec documents a response body but the response was empty")]
+                            "the spec documents a response body but the response was empty"
+                            f"{where('responses', str(status))}")]
         return header_warnings + [Finding(ERROR, "CONTENT_TYPE_MISSING", "header.Content-Type",
-                        "response has a body but no Content-Type header")]
+                        "response has a body but no Content-Type header"
+                        f"{where('responses', str(status))}")]
 
     media = pick_media_type(content, content_type)
     if media is None:
         main = content_type.split(";")[0].strip()
         listed = ", ".join(content) or "none"
         return header_warnings + [Finding(ERROR, "UNDOCUMENTED_CONTENT_TYPE", "header.Content-Type",
-                        f"content type {main} is not documented (documented: {listed})")]
+                        f"content type {main} is not documented (documented: {listed})"
+                        f"{where('responses', str(status))}")]
 
     if "json" not in media.lower():
         return header_warnings  # only JSON bodies are compared in this version
@@ -376,7 +451,8 @@ def _check_response(spec: dict, operation: dict, status: int,
         data = json.loads(body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         return header_warnings + [Finding(ERROR, "INVALID_JSON", "body",
-                        "response is declared as JSON but the body is not valid JSON")]
+                        "response is declared as JSON but the body is not valid JSON"
+                        f"{where('responses', str(status), 'content', media)}")]
 
     media_object = deref(spec, content[media]) or {}
     schema = media_object.get("schema") if isinstance(media_object, dict) else None
@@ -387,17 +463,19 @@ def _check_response(spec: dict, operation: dict, status: int,
     return list(dict.fromkeys(header_warnings + findings))  # drop duplicates, keep order
 
 
-def check_response(spec: dict, operation: dict, status: int,
-                   headers: dict, body: bytes) -> list[Finding]:
+def check_response(spec: dict[str, Any], operation: dict[str, Any], status: int,
+                   headers: dict[str, Any], body: bytes,
+                   spec_path: str | None = None) -> list[Finding]:
     """Return every difference between the live response and the spec.
 
     A 5xx answer covered only by the catch all `default` response is
     reported as a warning: the spec allows it, but it usually means
     the API is broken.
     """
-    found = _check_response(spec, operation, status, headers, body)
+    found = _check_response(spec, operation, status, headers, body, spec_path)
     keys = {str(k).upper() for k in (deref(spec, operation.get("responses")) or {})}
     if 500 <= status < 600 and not keys & {str(status), "5XX"} and "DEFAULT" in keys:
-        msg = f"server error {status} is only covered by the default response"
+        where = f" (in {spec_path}.responses)" if spec_path else ""
+        msg = f"server error {status} is only covered by the default response{where}"
         found = [Finding(WARNING, "SERVER_ERROR", "status", msg)] + found
     return found

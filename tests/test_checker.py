@@ -132,6 +132,13 @@ def test_undocumented_status_lists_documented_ones():
     assert "documented: 200" in result[0].message
 
 
+def test_undocumented_status_points_at_the_spec_response():
+    result = check_response(SPEC, _operation({"type": "object"}), 409, {}, b"{}",
+                            spec_path="paths./pets.get")
+    assert codes(result) == ["UNDOCUMENTED_STATUS"]
+    assert "in paths./pets.get.responses" in result[0].message
+
+
 def test_undocumented_content_type():
     result = check_response(SPEC, _operation({"type": "object"}), 200,
                             {"Content-Type": "text/html"}, b"<html>")

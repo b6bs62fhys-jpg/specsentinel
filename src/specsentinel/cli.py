@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -17,16 +18,16 @@ from .baseline import (
     write_baseline,
 )
 from .report import render_json, render_text
-from .runner import run_check
-from .spec import SpecError, load_spec
+from .runner import Report, run_check
+from .spec import DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_BYTES, SpecError, load_spec
 
 
-def _one_line(text) -> str:
+def _one_line(text: Any) -> str:
     """Collapse any exception text to a single line, so errors stay readable."""
     return " ".join(str(text).split())
 
 
-def _fatal(message, fmt: str) -> int:
+def _fatal(message: Any, fmt: str) -> int:
     """Print a fatal error and return exit code 2.
 
     The human readable message always goes to stderr. In JSON mode a small
@@ -39,7 +40,7 @@ def _fatal(message, fmt: str) -> int:
     return 2
 
 
-def _nothing_checked_message(report, base_url: str) -> str:
+def _nothing_checked_message(report: Report, base_url: str) -> str:
     if report.failed:
         reason = report.failed[0].error or "unknown error"
         if reason.startswith("spec problem"):
@@ -51,7 +52,7 @@ def _nothing_checked_message(report, base_url: str) -> str:
     return "the spec has no GET operations to check."
 
 
-def _should_collapse(report) -> bool:
+def _should_collapse(report: Report) -> bool:
     """True when nothing was checked and a one line error is clearer than a report.
 
     When every failure is a spec problem (a bad reference, for example) the
@@ -65,8 +66,8 @@ def _should_collapse(report) -> bool:
     return True
 
 
-def _parse_headers(values: list[str]) -> dict:
-    headers = {}
+def _parse_headers(values: list[str]) -> dict[str, str]:
+    headers: dict[str, str] = {}
     for raw in values:
         if ":" not in raw:
             raise ValueError(f"Invalid header '{raw}'. Use the form 'Name: value'.")
@@ -75,8 +76,8 @@ def _parse_headers(values: list[str]) -> dict:
     return headers
 
 
-def _parse_params(values: list[str]) -> dict:
-    params = {}
+def _parse_params(values: list[str]) -> dict[str, str]:
+    params: dict[str, str] = {}
     for raw in values:
         if "=" not in raw:
             raise ValueError(f"Invalid parameter '{raw}'. Use the form NAME=VALUE.")
@@ -85,7 +86,7 @@ def _parse_params(values: list[str]) -> dict:
     return params
 
 
-def _load_params_file(path: str) -> tuple[dict, dict]:
+def _load_params_file(path: str) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """Read a params file. Returns (defaults, per_operation).
 
     Plain entries apply to every operation that has a parameter of that name.
@@ -107,8 +108,8 @@ def _load_params_file(path: str) -> tuple[dict, dict]:
     if not isinstance(data, dict):
         raise ValueError("Params file must be a mapping of parameter names to values.")
 
-    defaults: dict = {}
-    per_operation: dict = {}
+    defaults: dict[str, Any] = {}
+    per_operation: dict[str, dict[str, Any]] = {}
     for key, value in data.items():
         if isinstance(value, dict) and str(key).strip().upper().startswith("GET "):
             label = "GET " + str(key).strip()[4:].strip()
@@ -143,6 +144,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="write all current findings to FILE as a JSON baseline")
     parser.add_argument("--timeout", type=float, default=10.0,
                         help="seconds to wait per request (default 10)")
+    parser.add_argument("--spec-timeout", type=float, default=DOWNLOAD_TIMEOUT,
+                        help=f"seconds to wait when downloading the spec and referenced "
+                             f"documents (default {DOWNLOAD_TIMEOUT:g})")
+    parser.add_argument("--spec-max-bytes", type=int, default=MAX_DOWNLOAD_BYTES,
+                        help=f"maximum size in bytes for the spec and referenced "
+                             f"documents (default {MAX_DOWNLOAD_BYTES})")
     parser.add_argument("--delay", type=float, default=0.0,
                         help="seconds to wait between requests (default 0)")
     parser.add_argument("--strict", action="store_true",
@@ -159,11 +166,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         headers = _parse_headers(args.header)
         overrides = _parse_params(args.param)
-        defaults, per_operation = ({}, {})
+        defaults: dict[str, Any] = {}
+        per_operation: dict[str, dict[str, Any]] = {}
         if args.params_file:
             defaults, per_operation = _load_params_file(args.params_file)
         baseline_entries = load_baseline(args.baseline) if args.baseline else []
-        spec = load_spec(args.spec)
+        spec = load_spec(args.spec, max_bytes=args.spec_max_bytes,
+                         timeout=args.spec_timeout)
     except (ValueError, SpecError, BaselineError) as exc:
         return _fatal(exc, args.format)
 
