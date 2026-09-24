@@ -34,6 +34,13 @@ inputs:
     description: Exact SpecSentinel version to install, for example "0.3.0". When empty, the latest release is installed.
     required: false
     default: ""
+  summary:
+    description: >-
+      Write a job summary and one annotation per operation with drift. Set to
+      "false" to keep the output in the step log only. The exit code is the same
+      either way.
+    required: false
+    default: "true"
 runs:
   using: composite
   steps:
@@ -61,9 +68,24 @@ runs:
         SENTINEL_HEADER: ${{ inputs.header }}
         SENTINEL_PARAMS_FILE: ${{ inputs.params_file }}
         SENTINEL_STRICT: ${{ inputs.strict }}
+        SENTINEL_SUMMARY: ${{ inputs.summary }}
+        SENTINEL_ACTION_PATH: ${{ github.action_path }}
       run: |
         args=(--url "$SENTINEL_URL")
         if [ -n "$SENTINEL_HEADER" ]; then args+=(--header "$SENTINEL_HEADER"); fi
         if [ -n "$SENTINEL_PARAMS_FILE" ]; then args+=(--params-file "$SENTINEL_PARAMS_FILE"); fi
         if [ "$SENTINEL_STRICT" = "true" ]; then args+=(--strict); fi
-        specsentinel "$SENTINEL_SPEC" "${args[@]}"
+        report="$(mktemp)"
+        # Report lines come from the spec and the API; they must not be read
+        # as workflow commands.
+        token="specsentinel-$RANDOM$RANDOM"
+        echo "::stop-commands::$token"
+        set +e
+        specsentinel "$SENTINEL_SPEC" "${args[@]}" 2>&1 | tee "$report"
+        code=${PIPESTATUS[0]}
+        set -e
+        echo "::$token::"
+        if [ "$SENTINEL_SUMMARY" = "true" ]; then
+          python "$SENTINEL_ACTION_PATH/action/summary.py" "$report" "$code" || true
+        fi
+        exit "$code"

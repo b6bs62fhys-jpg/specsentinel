@@ -257,3 +257,109 @@ lädt sofort und unumkehrbar auf PyPI hoch (`publish.yml`, Trusted Publishing).
    4. Formate `date`/`byte`; 5. konfigurierbare Download-Grenzen;
    6. Coverage in CI; 7. mypy in CI; 8. einheitliche Fehlertexte;
    9. GitHub-Action-Annotations; 10. Release-Kette vollenden.
+## Ausbau 2026-09-25
+
+Branch `ausbau-2026-09-25` (von `main` @ `a7b5861`). Kein Release, keine
+Versionsänderung (bleibt 0.3.0), alle CHANGELOG-Einträge unter
+`## [Unreleased]`. Nicht gepusht.
+
+### Commits je Teil
+
+| Teil | Commit | Inhalt |
+|---|---|---|
+| A Python-Versionen | `0936cfc` | CI-Matrix um 3.13 und 3.14, Klassifizierer `3 :: Only` |
+| B Fahrplan 8 | `f292a33` | Fehlermeldungen Params- und Baseline-Datei mit Datei und `(in ...)`-Stelle; unlesbare Datei → Exit 2 statt Traceback |
+| B Fahrplan 9 | `e4e67a3`, `f4365ad` | GitHub Action: Job-Summary und Annotation je Drift (`action/summary.py`, Eingabe `summary`); Folgecommit: Namenskonflikt mit `from __future__ import annotations` behoben (bei `mypy --strict` erst nach dem ersten Commit bemerkt) |
+| C b Beispiele | `e4de538` | `examples/01_simple_run.sh`, `02_baseline.sh`, `03_swagger2.sh`, `examples/README.md`, Test `tests/test_examples.py` |
+| C a README | `d58b0ba` | Erste zehn Zeilen: was, für wen, Auszug eines echten Laufs; veralteter „Real output"-Block durch echte 0.3.0-Ausgabe ersetzt; Test `tests/test_readme_example.py` |
+| C c Action-Doku | `8079f0c` | `docs/github-action.md` (Pinning, Baseline, include/exclude), im README verlinkt; Test `tests/test_github_action_doc.py` |
+| C d Metadaten | `90a942a` | `project.urls` (Documentation, Source), Keywords, zwei Klassifizierer; mit `python -m build` und `twine check` geprüft |
+| E Bericht | (dieser Commit) | dieser Abschnitt |
+
+### Fahrplan 6 bis 10
+
+| Nr. | Status | Begründung |
+|---|---|---|
+| 6 Coverage + Gate | übersprungen | Weder `coverage` noch `pytest-cov` sind Dev-Abhängigkeit; Teil D c schreibt für diesen Fall „nur vorschlagen" vor (Vorschlag unten). |
+| 7 mypy in CI | bereits erledigt | Steht seit `a7b5861` in `.github/workflows/ci.yml` (Schritt „Type check (mypy)"). |
+| 8 Fehlermeldungen | umgesetzt | `f292a33`, 9 Tests in `tests/test_file_errors.py`. Exit-Codes und JSON-Format unverändert, nur Meldungstexte. |
+| 9 Action Summary/Annotations | umgesetzt | `e4e67a3`/`f4365ad`, 8 Tests in `tests/test_action_summary.py`; zusätzlich lokal mit bash (`-eo pipefail`, wie GitHub) gegen die Demo-API ausgeführt: Exit 1 bzw. 0 durchgereicht, Summary und Annotationen korrekt. Wirkt erst ab dem nächsten Action-Tag. |
+| 10 Release-Kette | ausgelassen | Auftrag: kein Release. Außerdem inzwischen überholt: Tag `v0.3.0` existiert, PyPI steht auf 0.3.0 (`docs/fahrplan.md` ist in diesem Punkt veraltet, nicht geändert). |
+
+### Python-Versionen: CI 3.13/3.14 noch nicht gesehen
+
+Die CI-Matrix enthält jetzt 3.9 bis 3.14. **Die Läufe für 3.13 und 3.14 habe
+ich nicht gesehen**: Der Branch ist nicht gepusht, lokal gibt es nur
+Python 3.9.6, und Docker/Colima habe ich nicht ungefragt gestartet. Eine
+statische Suche nach in 3.13/3.14 entfernten Standardbibliotheks-Modulen
+(`cgi`, `imghdr`, `telnetlib`, `distutils`, `pkg_resources` u. a.) fand
+nichts; PyYAML 6.0.3 hat Wheels für beide Versionen. **Die Klassifizierer für
+3.13 und 3.14 fehlen deshalb bewusst**; sie gehören erst nach einem grünen
+CI-Lauf hinein (Einzeiler in `pyproject.toml` plus CHANGELOG).
+
+### Vorschlag Mindestversion (`requires-python` nicht geändert)
+
+- Python 3.9 bekommt seit Oktober 2025 keine Sicherheitsupdates mehr; 3.10
+  endet im Oktober 2026, also in wenigen Tagen.
+- Vorschlag: mit dem nächsten Minor-Release (0.4.0) `requires-python >=3.10`,
+  im CHANGELOG als Breaking Change für 3.9-Nutzer angekündigt; 3.9 aus
+  Matrix und Klassifizierern nehmen. Anfang 2027 dann `>=3.11`.
+- Warum nicht sofort 3.11: Ubuntu 22.04 LTS (Support bis 2027) bringt 3.10 als
+  System-Python mit; wer SpecSentinel dort ohne `setup-python` nutzt, würde
+  sonst ausgesperrt. In GitHub Actions ist die Version egal (`setup-python`).
+- Folge fürs Repo: Die lokale Entwicklungsumgebung `.venv` läuft auf dem
+  macOS-System-Python 3.9 und müsste neu angelegt werden.
+
+### Teil D: Pflege
+
+**a) Pinning in `action_test.yml` (0.1.1 → 0.3.0?), nicht geändert.**
+0.3.0 ist auf PyPI verfügbar (geprüft: Releases 0.1.0 bis 0.3.0). Empfehlung:
+0.1.1 **nicht ersetzen, sondern einen zweiten Schritt mit 0.3.0 ergänzen.**
+Der Test prüft den Pinning-Mechanismus, nicht Funktionen; 0.1.1 belegt
+zusätzlich, dass die Action mit der ältesten pinnbaren Version funktioniert.
+Das ist seit Fahrplan 9 relevanter, weil `action/summary.py` den Textbericht
+aller Versionen lesen muss. Der Schritt mit 0.3.0 belegt die aktuelle Version.
+Nur ersetzen, falls 0.1.1 auf dem Runner-Python einmal nicht mehr installierbar ist.
+
+**b) TODO/FIXME.** Keine. Gesucht (auch ohne Groß-/Kleinschreibung, inkl.
+`XXX`, `HACK`) in `src`, `tests`, `tools`, `docs`, `examples`, Workflows.
+Einziger Marker: `# type: ignore[misc]` in `action/summary.py:30` (von mir, nötig,
+`mypy --strict` meldet unbenutzte Ignores).
+
+**c) Testabdeckung.** Nicht gemessen: kein Abdeckungswerkzeug in den
+Dev-Abhängigkeiten. Vorschlag: `pytest-cov` in `[project.optional-dependencies] dev`,
+CI-Schritt `pytest --cov=specsentinel --cov-report=term-missing` zunächst
+ohne Schwelle, nach zwei Läufen Gate knapp unter dem gemessenen Wert (= Fahrplan 6).
+
+### Endstand
+
+- Tests: 160 → **189 passed** (Python 3.9.6, `.venv`).
+- mypy: `mypy src/specsentinel` ohne Befund (9 Dateien); zusätzlich
+  `mypy --strict action/summary.py` ohne Befund.
+- CLI-Verhalten und JSON-Format unverändert; keine neue Laufzeitabhängigkeit;
+  `requires-python` und Version unverändert.
+
+### Offene Fragen
+
+1. Soll die Action Eingaben für `--baseline`, `--include`, `--exclude`
+   bekommen? Dann bräuchte `docs/github-action.md` den CLI-Umweg nicht mehr.
+   Das ist eine sichtbare Schnittstelle und wirkt erst mit einem neuen Tag.
+2. Action-Release: Die `summary`-Eingabe wirkt erst mit einem neuen
+   Action-Tag. Wann und unter welcher Nummer?
+3. Relative Links im README (`LICENSE`, `examples/README.md`,
+   `docs/github-action.md`) funktionieren auf GitHub, aber nicht auf der
+   PyPI-Seite. Beim nächsten Release auf absolute URLs umstellen?
+4. `docs/fahrplan.md` ist teils veraltet (Tag `v0.3.0` und PyPI 0.3.0
+   existieren inzwischen). Aktualisieren?
+5. Klassifizierer 3.13/3.14 nach grünem CI-Lauf ergänzen (siehe oben).
+
+### Drei Stellen, zuerst zu lesen
+
+1. `action.yml` (Schritt „Check API against spec") und `action/summary.py`:
+   die einzige Änderung, die in den Pipelines der Nutzer läuft (Exit-Code-
+   Durchreichung über `PIPESTATUS`, `stop-commands`).
+2. `src/specsentinel/baseline.py` (`load_baseline`) und
+   `src/specsentinel/cli.py` (`_load_params_file`): geänderte Fehlertexte und
+   der vorher ungefangene Lesefehler.
+3. `docs/github-action.md`: öffentliche Doku mit Versprechen; bewusst ohne
+   Eingaben, die es im `v0.3.0`-Tag nicht gibt (gegen den Tag geprüft).

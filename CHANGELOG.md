@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `examples/` has three runnable example scripts with a README: a simple
+  run, adopting SpecSentinel with a baseline, and a Swagger 2.0 source. A
+  test runs all three.
+- `docs/github-action.md`: example workflows for the action and for the CLI
+  in a `run` step, with version pinning (action tag or SHA plus package
+  version), a baseline and `--include`/`--exclude`. Linked from the README; a
+  test checks that every action input and CLI option used in it exists.
+
+- The GitHub Action writes a job summary (result, counts, operations with
+  drift, full report) and one annotation per drifting operation. The new
+  `summary` input (default `true`) turns this off. The exit code is passed
+  through unchanged, and report lines can no longer be read as workflow
+  commands. Works with every pinned SpecSentinel version, because it reads
+  the text report.
+
+### Fixed
+
+- The README now opens with what SpecSentinel does, for whom, and an excerpt
+  of a real run. The "Real output" block was out of date (it predated the
+  `(in ...)` locations and the skipped notice of 0.3.0) and is replaced with
+  the current output; a test compares both with a real run.
+- Errors in the params file and the baseline file now always name the file
+  and the place inside it, in the same `(in ...)` style as spec errors, for
+  example `(in findings[1].code)`. A params or baseline file that cannot be
+  read (no permission, not UTF-8) now ends with exit code 2 and a clear
+  message instead of a traceback. The exit codes and the JSON format are
+  unchanged.
+
+### Changed
+
+- Package metadata: `Documentation` and `Source` links, more keywords, and
+  the classifiers `Intended Audience :: Developers` and
+  `Topic :: Software Development :: Quality Assurance`.
+- CI now also runs the tests and the type check on Python 3.13 and 3.14.
+  The classifiers list the versions that have passed CI; 3.13 and 3.14 are
+  added there once their CI runs are green. `requires-python` is unchanged.
+
 ## [0.3.0] - 2026-09-24
 
 ### Added
