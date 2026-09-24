@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Package metadata: `Documentation` and `Source` links, more keywords, and
+  the classifiers `Intended Audience :: Developers` and
+  `Topic :: Software Development :: Quality Assurance`.
 - CI now also runs the tests and the type check on Python 3.13 and 3.14.
   The classifiers list the versions that have passed CI; 3.13 and 3.14 are
   added there once their CI runs are green. `requires-python` is unchanged.
