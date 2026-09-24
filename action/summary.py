@@ -30,7 +30,7 @@ def _operations(text: str) -> list[tuple[str, str, str, str]]:
     return [m.groups() for m in map(_OPERATION.match, text.splitlines()) if m]  # type: ignore[misc]
 
 
-def annotations(text: str, code: int) -> list[str]:
+def annotation_lines(text: str, code: int) -> list[str]:
     """One annotation per drifting or failed operation; one for exit code 2."""
     if code == 2:
         return ["::error title=SpecSentinel::The check could not be completed (exit code 2)."]
@@ -79,7 +79,7 @@ def main(argv: list[str], env: Optional[Mapping[str, str]] = None) -> int:
             text = handle.read()
     except (IndexError, ValueError, OSError):
         return 0
-    for line in annotations(text, code):
+    for line in annotation_lines(text, code):
         print(line)
     target = env.get("GITHUB_STEP_SUMMARY")
     if target:

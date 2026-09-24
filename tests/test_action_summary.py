@@ -27,7 +27,7 @@ def real_report(capsys, spec_path, url, *extra):
 def test_drift_run_gives_error_annotation_per_drifting_operation(capsys, spec_path, start_server):
     code, text = real_report(capsys, spec_path, start_server(drift=True))
     assert code == 1
-    annotations = summary.annotations(text, code)
+    annotations = summary.annotation_lines(text, code)
     assert annotations, "drift must produce annotations"
     assert all(a.startswith("::error title=SpecSentinel drift::") for a in annotations)
     drifting = [line for line in text.splitlines() if line.rstrip().endswith("DRIFT") and not line.startswith("Result")]
@@ -47,7 +47,7 @@ def test_drift_run_summary_names_result_counts_and_operations(capsys, spec_path,
 def test_matching_run_has_no_annotations(capsys, spec_path, start_server):
     code, text = real_report(capsys, spec_path, start_server(drift=False))
     assert code == 0
-    assert summary.annotations(text, code) == []
+    assert summary.annotation_lines(text, code) == []
     assert "No drift (exit code 0)" in summary.markdown(text, code)
 
 
@@ -55,14 +55,14 @@ def test_run_that_could_not_complete(capsys, spec_path):
     code = main([spec_path, "--url", "http://127.0.0.1:1"])
     text = capsys.readouterr()
     assert code == 2
-    annotations = summary.annotations(text.out, code)
+    annotations = summary.annotation_lines(text.out, code)
     assert annotations == ["::error title=SpecSentinel::The check could not be completed (exit code 2)."]
     assert "Check could not be completed (exit code 2)" in summary.markdown(text.out, code)
 
 
 def test_values_from_spec_or_api_are_escaped():
     text = "GET /x%0A::warning::boom,a:b  200  DRIFT\n"
-    [annotation] = summary.annotations(text, 1)
+    [annotation] = summary.annotation_lines(text, 1)
     assert "\n" not in annotation
     assert "%250A" in annotation  # % is escaped first, so no injected newline
     assert annotation.count("::") == 2  # only the command's own separators
@@ -78,7 +78,7 @@ def test_old_text_format_is_understood():
         "    error   TYPE_MISMATCH   body.id\n\n"
         "2 checked, 1 with drift, 0 skipped, 0 failed\nResult: DRIFT (exit code 1)\n"
     )
-    assert summary.annotations(old, 1) == ["::error title=SpecSentinel drift::GET /pets/{id} returned 200 and does not match the spec."]
+    assert summary.annotation_lines(old, 1) == ["::error title=SpecSentinel drift::GET /pets/{id} returned 200 and does not match the spec."]
 
 
 def test_main_writes_summary_and_never_changes_the_exit_code(tmp_path, capsys):
