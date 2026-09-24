@@ -272,6 +272,9 @@ not written to the log), `params_file`, `strict` (default `false`),
 SpecSentinel release that gets installed, for example `0.3.0`. When it is
 empty, the latest release is installed.
 
+A complete guide with version pinning, baseline and path filters is in
+[docs/github-action.md](docs/github-action.md).
+
 Not yet in the `v0.3.0` action tag, available from the next action release:
 the `summary` input (default `true`) writes a job summary with the result, the
 counts and the operations with drift, and adds one annotation per drifting

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `examples/` has three runnable example scripts with a README: a simple
   run, adopting SpecSentinel with a baseline, and a Swagger 2.0 source. A
   test runs all three.
+- `docs/github-action.md`: example workflows for the action and for the CLI
+  in a `run` step, with version pinning (action tag or SHA plus package
+  version), a baseline and `--include`/`--exclude`. Linked from the README; a
+  test checks that every action input and CLI option used in it exists.
 
 - The GitHub Action writes a job summary (result, counts, operations with
   drift, full report) and one annotation per drifting operation. The new
