@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI now also runs the tests and the type check on Python 3.13 and 3.14.
+  The classifiers list the versions that have passed CI; 3.13 and 3.14 are
+  added there once their CI runs are green. `requires-python` is unchanged.
+
 ## [0.3.0] - 2026-09-24
 
 ### Added
