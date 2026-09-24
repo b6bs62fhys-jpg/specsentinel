@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/` has three runnable example scripts with a README: a simple
+  run, adopting SpecSentinel with a baseline, and a Swagger 2.0 source. A
+  test runs all three.
+
 - The GitHub Action writes a job summary (result, counts, operations with
   drift, full report) and one annotation per drifting operation. The new
   `summary` input (default `true`) turns this off. The exit code is passed
